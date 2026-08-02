@@ -240,20 +240,21 @@ fn generate_lorem_ipsum(count: usize) -> String {
     ];
 
     let mut rng_state = 12345u32;
-    let mut next_word = || {
+    let mut next_rand = || {
         rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
-        words[(rng_state as usize) % words.len()]
+        rng_state
     };
 
     let mut paragraphs = Vec::new();
     for _ in 0..count {
         let mut sentences = Vec::new();
-        let sentence_count = 3 + (rng_state as usize) % 4;
+        let sentence_count = 3 + (next_rand() as usize) % 4;
         for s in 0..sentence_count {
             let word_count = 8 + (s * 7) % 12;
             let mut sentence_words: Vec<String> = Vec::new();
             for _ in 0..word_count {
-                sentence_words.push(next_word().to_string());
+                let r = next_rand();
+                sentence_words.push(words[(r as usize) % words.len()].to_string());
             }
             let mut sentence = sentence_words.join(" ");
             if let Some(first) = sentence.get_mut(0..1) {
