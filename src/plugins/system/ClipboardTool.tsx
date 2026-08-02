@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
-import { List, Typography, Button, Space, Card, Input, Tag, message, Empty, Statistic, Row, Col } from "antd";
+import {
+  List,
+  Typography,
+  Button,
+  Space,
+  Card,
+  Input,
+  Tag,
+  message,
+  Empty,
+  Statistic,
+  Row,
+  Col,
+} from "antd";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 interface ClipItem {
@@ -26,7 +39,10 @@ export default function ClipboardTool() {
         if (autoWatch) {
           setHistory((prev) => {
             if (prev.some((item) => item.text === text)) return prev;
-            return [{ id: Date.now(), text, time: Date.now(), pinned: false }, ...prev].slice(0, 100);
+            return [{ id: Date.now(), text, time: Date.now(), pinned: false }, ...prev].slice(
+              0,
+              100
+            );
           });
         }
       }
@@ -48,7 +64,11 @@ export default function ClipboardTool() {
     try {
       await writeText(text);
     } catch {
-      try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        /* ignore */
+      }
     }
     setLastClip(text);
     setCurrent(text);
@@ -58,12 +78,17 @@ export default function ClipboardTool() {
   const capture = async () => {
     try {
       const text = await readText().catch(async () => navigator.clipboard.readText());
-      if (!text) { message.warning("剪贴板为空"); return; }
+      if (!text) {
+        message.warning("剪贴板为空");
+        return;
+      }
       if (history.some((item) => item.text === text)) {
         message.info("该项已存在");
         return;
       }
-      setHistory([{ id: Date.now(), text, time: Date.now(), pinned: false }, ...history].slice(0, 100));
+      setHistory(
+        [{ id: Date.now(), text, time: Date.now(), pinned: false }, ...history].slice(0, 100)
+      );
       message.success("已捕获到历史");
     } catch {
       message.error("无法读取剪贴板");
@@ -82,7 +107,7 @@ export default function ClipboardTool() {
   };
 
   const togglePin = (id: number) => {
-    setHistory(history.map((item) => item.id === id ? { ...item, pinned: !item.pinned } : item));
+    setHistory(history.map((item) => (item.id === id ? { ...item, pinned: !item.pinned } : item)));
   };
 
   const clearAll = () => {
@@ -104,7 +129,11 @@ export default function ClipboardTool() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="当前剪贴板" value={current ? `${current.slice(0, 30)}${current.length > 30 ? "..." : ""}` : "空"} valueStyle={{ fontSize: 14 }} />
+            <Statistic
+              title="当前剪贴板"
+              value={current ? `${current.slice(0, 30)}${current.length > 30 ? "..." : ""}` : "空"}
+              valueStyle={{ fontSize: 14 }}
+            />
           </Card>
         </Col>
         <Col span={8}>
@@ -120,12 +149,16 @@ export default function ClipboardTool() {
       </Row>
 
       <Space style={{ marginBottom: 12 }} wrap>
-        <Button type="primary" onClick={capture}>捕获当前剪贴板</Button>
+        <Button type="primary" onClick={capture}>
+          捕获当前剪贴板
+        </Button>
         <Button onClick={() => setAutoWatch(!autoWatch)}>
           {autoWatch ? "停止监听" : "自动监听"}
         </Button>
         <Button onClick={readClipboard}>刷新当前</Button>
-        <Button onClick={clearAll} danger>清空历史</Button>
+        <Button onClick={clearAll} danger>
+          清空历史
+        </Button>
         <Tag color={autoWatch ? "green" : "default"}>{autoWatch ? "监听中..." : "未监听"}</Tag>
       </Space>
 
@@ -145,20 +178,21 @@ export default function ClipboardTool() {
           renderItem={(item) => (
             <List.Item
               actions={[
-                <Button size="small" type="link" onClick={() => writeClipboard(item.text)}>复制</Button>,
+                <Button size="small" type="link" onClick={() => writeClipboard(item.text)}>
+                  复制
+                </Button>,
                 <Button size="small" type="link" onClick={() => togglePin(item.id)}>
                   {item.pinned ? "取消置顶" : "置顶"}
                 </Button>,
-                <Button size="small" type="link" danger onClick={() => deleteItem(item.id)}>删除</Button>,
+                <Button size="small" type="link" danger onClick={() => deleteItem(item.id)}>
+                  删除
+                </Button>,
               ]}
             >
               <List.Item.Meta
                 avatar={item.pinned ? <Tag color="orange">置顶</Tag> : undefined}
                 title={
-                  <Typography.Text
-                    style={{ maxWidth: 600, display: "inline-block" }}
-                    ellipsis
-                  >
+                  <Typography.Text style={{ maxWidth: 600, display: "inline-block" }} ellipsis>
                     {item.text}
                   </Typography.Text>
                 }

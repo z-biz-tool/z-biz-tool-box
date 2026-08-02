@@ -8,7 +8,11 @@ function hexToRgb(hex: string): RGB | null {
   const m = hex.replace("#", "").match(/^([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/);
   if (!m) return null;
   let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   return {
     r: parseInt(h.slice(0, 2), 16),
     g: parseInt(h.slice(2, 4), 16),
@@ -17,21 +21,33 @@ function hexToRgb(hex: string): RGB | null {
 }
 
 function rgbToHex(rgb: RGB): string {
-  return "#" + [rgb.r, rgb.g, rgb.b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" + [rgb.r, rgb.g, rgb.b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("")
+  );
 }
 
 function rgbToHsl(rgb: RGB): HSL {
-  const r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
+  const r = rgb.r / 255,
+    g = rgb.g / 255,
+    b = rgb.b / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
+  let h = 0,
+    s = 0;
   const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
     }
     h /= 6;
   }
@@ -39,7 +55,9 @@ function rgbToHsl(rgb: RGB): HSL {
 }
 
 function hslToRgb(hsl: HSL): RGB {
-  const h = hsl.h / 360, s = hsl.s / 100, l = hsl.l / 100;
+  const h = hsl.h / 360,
+    s = hsl.s / 100,
+    l = hsl.l / 100;
   let r, g, b;
   if (s === 0) {
     r = g = b = l;
@@ -62,9 +80,24 @@ function hslToRgb(hsl: HSL): RGB {
 }
 
 const PRESETS = [
-  "#1890ff", "#52c41a", "#722ed1", "#eb2f96", "#fa541c", "#faad14",
-  "#13c2c2", "#2f54eb", "#a0d911", "#f5222d", "#fa8c16", "#08979c",
-  "#000000", "#ffffff", "#595959", "#8c8c8c", "#bfbfbf", "#d9d9d9",
+  "#1890ff",
+  "#52c41a",
+  "#722ed1",
+  "#eb2f96",
+  "#fa541c",
+  "#faad14",
+  "#13c2c2",
+  "#2f54eb",
+  "#a0d911",
+  "#f5222d",
+  "#fa8c16",
+  "#08979c",
+  "#000000",
+  "#ffffff",
+  "#595959",
+  "#8c8c8c",
+  "#bfbfbf",
+  "#d9d9d9",
 ];
 
 export default function ColorTool() {
@@ -134,8 +167,13 @@ export default function ColorTool() {
                   key={c}
                   onClick={() => updateFromHex(c)}
                   style={{
-                    width: 32, height: 32, background: c, borderRadius: 4,
-                    cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #d9d9d9",
+                    width: 32,
+                    height: 32,
+                    background: c,
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    border: "2px solid #fff",
+                    boxShadow: "0 0 0 1px #d9d9d9",
                   }}
                   title={c}
                 />
@@ -147,31 +185,92 @@ export default function ColorTool() {
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col span={8}>
           <Card size="small" title={<Tag color="red">HEX</Tag>} type="inner">
-            <Input value={hex} onChange={(e) => updateFromHex(e.target.value)} style={{ fontFamily: "monospace" }} />
-            <a onClick={() => copy(hex)} style={{ fontSize: 12 }}>复制</a>
+            <Input
+              value={hex}
+              onChange={(e) => updateFromHex(e.target.value)}
+              style={{ fontFamily: "monospace" }}
+            />
+            <a onClick={() => copy(hex)} style={{ fontSize: 12 }}>
+              复制
+            </a>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" title={<Tag color="green">RGB</Tag>} type="inner">
             <Space>
-              <Input type="number" min={0} max={255} value={rgb.r} onChange={(e) => updateFromRgb("r", +e.target.value)} addonBefore="R" style={{ width: 100 }} />
-              <Input type="number" min={0} max={255} value={rgb.g} onChange={(e) => updateFromRgb("g", +e.target.value)} addonBefore="G" style={{ width: 100 }} />
-              <Input type="number" min={0} max={255} value={rgb.b} onChange={(e) => updateFromRgb("b", +e.target.value)} addonBefore="B" style={{ width: 100 }} />
+              <Input
+                type="number"
+                min={0}
+                max={255}
+                value={rgb.r}
+                onChange={(e) => updateFromRgb("r", +e.target.value)}
+                addonBefore="R"
+                style={{ width: 100 }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={255}
+                value={rgb.g}
+                onChange={(e) => updateFromRgb("g", +e.target.value)}
+                addonBefore="G"
+                style={{ width: 100 }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={255}
+                value={rgb.b}
+                onChange={(e) => updateFromRgb("b", +e.target.value)}
+                addonBefore="B"
+                style={{ width: 100 }}
+              />
             </Space>
             <div style={{ marginTop: 8 }}>
-              <a onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} style={{ fontSize: 12 }}>复制 rgb()</a>
+              <a onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} style={{ fontSize: 12 }}>
+                复制 rgb()
+              </a>
             </div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" title={<Tag color="blue">HSL</Tag>} type="inner">
             <Space>
-              <Input type="number" min={0} max={360} value={hsl.h} onChange={(e) => updateFromHsl("h", +e.target.value)} addonBefore="H" style={{ width: 100 }} />
-              <Input type="number" min={0} max={100} value={hsl.s} onChange={(e) => updateFromHsl("s", +e.target.value)} addonBefore="S" style={{ width: 100 }} />
-              <Input type="number" min={0} max={100} value={hsl.l} onChange={(e) => updateFromHsl("l", +e.target.value)} addonBefore="L" style={{ width: 100 }} />
+              <Input
+                type="number"
+                min={0}
+                max={360}
+                value={hsl.h}
+                onChange={(e) => updateFromHsl("h", +e.target.value)}
+                addonBefore="H"
+                style={{ width: 100 }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={hsl.s}
+                onChange={(e) => updateFromHsl("s", +e.target.value)}
+                addonBefore="S"
+                style={{ width: 100 }}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={hsl.l}
+                onChange={(e) => updateFromHsl("l", +e.target.value)}
+                addonBefore="L"
+                style={{ width: 100 }}
+              />
             </Space>
             <div style={{ marginTop: 8 }}>
-              <a onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} style={{ fontSize: 12 }}>复制 hsl()</a>
+              <a
+                onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)}
+                style={{ fontSize: 12 }}
+              >
+                复制 hsl()
+              </a>
             </div>
           </Card>
         </Col>
@@ -180,9 +279,27 @@ export default function ColorTool() {
         <Col span={12}>
           <Card size="small" type="inner" title="互补色">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 40, height: 40, background: hex, borderRadius: 4, border: "1px solid #d9d9d9" }} />
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  background: hex,
+                  borderRadius: 4,
+                  border: "1px solid #d9d9d9",
+                }}
+              />
               <span>→</span>
-              <div style={{ width: 40, height: 40, background: complementary, borderRadius: 4, border: "1px solid #d9d9d9", cursor: "pointer" }} onClick={() => updateFromHex(complementary)} />
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  background: complementary,
+                  borderRadius: 4,
+                  border: "1px solid #d9d9d9",
+                  cursor: "pointer",
+                }}
+                onClick={() => updateFromHex(complementary)}
+              />
               <Tag>{complementary}</Tag>
             </div>
           </Card>

@@ -9,7 +9,9 @@ export default function Base64Tool() {
   const encode = async () => {
     try {
       const result = await invoke<string>("execute_plugin", {
-        pluginId: "base64", action: "encode", input,
+        pluginId: "base64",
+        action: "encode",
+        input,
       });
       setOutput(result);
     } catch {
@@ -25,7 +27,9 @@ export default function Base64Tool() {
   const decode = async () => {
     try {
       const result = await invoke<string>("execute_plugin", {
-        pluginId: "base64", action: "decode", input,
+        pluginId: "base64",
+        action: "decode",
+        input,
       });
       setOutput(result);
     } catch {
@@ -51,10 +55,21 @@ export default function Base64Tool() {
         placeholder="输入要编码/解码的文本"
       />
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={encode}>编码</Button>
+        <Button type="primary" onClick={encode}>
+          编码
+        </Button>
         <Button onClick={decode}>解码</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={copyOut} disabled={!output}>复制结果</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button onClick={copyOut} disabled={!output}>
+          复制结果
+        </Button>
       </Space>
       <Input.TextArea rows={5} value={output} readOnly style={{ fontFamily: "monospace" }} />
     </Card>

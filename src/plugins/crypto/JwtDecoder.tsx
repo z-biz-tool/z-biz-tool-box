@@ -3,7 +3,11 @@ import { Input, Card, Row, Col, Tag, Alert, Typography, Space } from "antd";
 
 export default function JwtDecoder() {
   const [token, setToken] = useState("");
-  const [parts, setParts] = useState<{ header: unknown; payload: unknown; signature: string } | null>(null);
+  const [parts, setParts] = useState<{
+    header: unknown;
+    payload: unknown;
+    signature: string;
+  } | null>(null);
   const [error, setError] = useState("");
 
   const decode = (value: string) => {
@@ -61,26 +65,48 @@ export default function JwtDecoder() {
       {parts && (
         <div style={{ marginTop: 12 }}>
           <Space>
-            <Tag color="blue">算法: {String((parts.header as Record<string, unknown>)?.alg || "unknown")}</Tag>
+            <Tag color="blue">
+              算法: {String((parts.header as Record<string, unknown>)?.alg || "unknown")}
+            </Tag>
             <Tag color={isExpired() ? "red" : "green"}>{isExpired() ? "已过期" : "有效"}</Tag>
             {(parts.payload as Record<string, number>)?.iat && (
-              <Tag>签发: {new Date((parts.payload as Record<string, number>).iat * 1000).toLocaleString()}</Tag>
+              <Tag>
+                签发:{" "}
+                {new Date((parts.payload as Record<string, number>).iat * 1000).toLocaleString()}
+              </Tag>
             )}
             {(parts.payload as Record<string, number>)?.exp && (
-              <Tag>过期: {new Date((parts.payload as Record<string, number>).exp * 1000).toLocaleString()}</Tag>
+              <Tag>
+                过期:{" "}
+                {new Date((parts.payload as Record<string, number>).exp * 1000).toLocaleString()}
+              </Tag>
             )}
           </Space>
           <Row gutter={16} style={{ marginTop: 12 }}>
             <Col span={8}>
               <Card size="small" title={<Tag color="purple">Header</Tag>} type="inner">
-                <pre style={{ fontSize: 12, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                <pre
+                  style={{
+                    fontSize: 12,
+                    margin: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-all",
+                  }}
+                >
                   {pretty(parts.header)}
                 </pre>
               </Card>
             </Col>
             <Col span={8}>
               <Card size="small" title={<Tag color="cyan">Payload</Tag>} type="inner">
-                <pre style={{ fontSize: 12, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                <pre
+                  style={{
+                    fontSize: 12,
+                    margin: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-all",
+                  }}
+                >
                   {pretty(parts.payload)}
                 </pre>
               </Card>

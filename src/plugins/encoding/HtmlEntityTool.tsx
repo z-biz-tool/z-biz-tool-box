@@ -66,7 +66,9 @@ export default function HtmlEntityTool() {
     }
     // 解码数字实体 &#123; 和 &#x7B;
     result = result.replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
-    result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
+    result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    );
     setOutput(result);
   };
 
@@ -98,10 +100,21 @@ export default function HtmlEntityTool() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={encode}>编码</Button>
+        <Button type="primary" onClick={encode}>
+          编码
+        </Button>
         <Button onClick={decode}>解码</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={copyOut} disabled={!output}>复制结果</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button onClick={copyOut} disabled={!output}>
+          复制结果
+        </Button>
       </Space>
     </Card>
   );

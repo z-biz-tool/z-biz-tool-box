@@ -9,24 +9,30 @@ export default function CaseTool() {
   const toLower = () => setOutput(input.toLowerCase());
 
   const toTitle = () => {
-    setOutput(input.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()));
+    setOutput(
+      input.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
+    );
   };
 
   const toCamel = () => {
     const words = input.replace(/[-_]/g, " ").split(/\s+/).filter(Boolean);
-    const result = words.map((w, i) => {
-      const lower = w.toLowerCase();
-      return i === 0 ? lower : lower.charAt(0).toUpperCase() + lower.slice(1);
-    }).join("");
+    const result = words
+      .map((w, i) => {
+        const lower = w.toLowerCase();
+        return i === 0 ? lower : lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join("");
     setOutput(result);
   };
 
   const toPascal = () => {
     const words = input.replace(/[-_]/g, " ").split(/\s+/).filter(Boolean);
-    const result = words.map((w) => {
-      const lower = w.toLowerCase();
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    }).join("");
+    const result = words
+      .map((w) => {
+        const lower = w.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join("");
     setOutput(result);
   };
 
@@ -66,7 +72,9 @@ export default function CaseTool() {
         placeholder="输入要转换的文本"
       />
       <Space wrap style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={toUpper}>UPPER 大写</Button>
+        <Button type="primary" onClick={toUpper}>
+          UPPER 大写
+        </Button>
         <Button onClick={toLower}>lower 小写</Button>
         <Button onClick={toTitle}>Title 首字母大写</Button>
         <Button onClick={toCamel}>camelCase 驼峰</Button>
@@ -74,10 +82,24 @@ export default function CaseTool() {
         <Button onClick={toSnake}>snake_case 下划线</Button>
         <Button onClick={toKebab}>kebab-case 短横线</Button>
         <Button onClick={toSentence}>Sentence 句首大写</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={copyOut} disabled={!output}>复制结果</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button onClick={copyOut} disabled={!output}>
+          复制结果
+        </Button>
       </Space>
-      <Input.TextArea rows={5} value={output} readOnly style={{ fontFamily: "monospace", background: "#fafafa" }} />
+      <Input.TextArea
+        rows={5}
+        value={output}
+        readOnly
+        style={{ fontFamily: "monospace", background: "#fafafa" }}
+      />
     </Card>
   );
 }

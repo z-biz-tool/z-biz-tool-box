@@ -2,15 +2,79 @@ import { useState } from "react";
 import { Card, InputNumber, Button, Space, Input, Select, Row, Col, message } from "antd";
 
 const WORDS = [
-  "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit",
-  "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore",
-  "magna", "aliqua", "enim", "ad", "minim", "veniam", "quis", "nostrud",
-  "exercitation", "ullamco", "laboris", "nisi", "aliquip", "ex", "ea", "commodo",
-  "consequat", "duis", "aute", "irure", "in", "reprehenderit", "voluptate",
-  "velit", "esse", "cillum", "fugiat", "nulla", "pariatur", "excepteur", "sint",
-  "occaecat", "cupidatat", "non", "proident", "sunt", "culpa", "qui", "officia",
-  "deserunt", "mollit", "anim", "id", "est", "laborum", "at", "vero", "eos",
-  "accusam", "justo", "duo", "dolores", "clita", "gubergren", "no", "takimata",
+  "lorem",
+  "ipsum",
+  "dolor",
+  "sit",
+  "amet",
+  "consectetur",
+  "adipiscing",
+  "elit",
+  "sed",
+  "do",
+  "eiusmod",
+  "tempor",
+  "incididunt",
+  "ut",
+  "labore",
+  "et",
+  "dolore",
+  "magna",
+  "aliqua",
+  "enim",
+  "ad",
+  "minim",
+  "veniam",
+  "quis",
+  "nostrud",
+  "exercitation",
+  "ullamco",
+  "laboris",
+  "nisi",
+  "aliquip",
+  "ex",
+  "ea",
+  "commodo",
+  "consequat",
+  "duis",
+  "aute",
+  "irure",
+  "in",
+  "reprehenderit",
+  "voluptate",
+  "velit",
+  "esse",
+  "cillum",
+  "fugiat",
+  "nulla",
+  "pariatur",
+  "excepteur",
+  "sint",
+  "occaecat",
+  "cupidatat",
+  "non",
+  "proident",
+  "sunt",
+  "culpa",
+  "qui",
+  "officia",
+  "deserunt",
+  "mollit",
+  "anim",
+  "id",
+  "est",
+  "laborum",
+  "at",
+  "vero",
+  "eos",
+  "accusam",
+  "justo",
+  "duo",
+  "dolores",
+  "clita",
+  "gubergren",
+  "no",
+  "takimata",
 ];
 
 function randomSentence(minWords = 6, maxWords = 15): string {
@@ -106,11 +170,26 @@ export default function LoremTool() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={generate}>生成</Button>
-        <Button onClick={() => { navigator.clipboard.writeText(output); message.success("已复制"); }} disabled={!output}>复制结果</Button>
+        <Button type="primary" onClick={generate}>
+          生成
+        </Button>
+        <Button
+          onClick={() => {
+            navigator.clipboard.writeText(output);
+            message.success("已复制");
+          }}
+          disabled={!output}
+        >
+          复制结果
+        </Button>
         <Button onClick={() => setOutput("")}>清空</Button>
       </Space>
-      <Input.TextArea rows={10} value={output} readOnly style={{ fontFamily: "serif", background: "#fafafa" }} />
+      <Input.TextArea
+        rows={10}
+        value={output}
+        readOnly
+        style={{ fontFamily: "serif", background: "#fafafa" }}
+      />
     </Card>
   );
 }

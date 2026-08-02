@@ -20,7 +20,9 @@ export default function JsonTool() {
   const format = async () => {
     try {
       const result = await invoke<string>("execute_plugin", {
-        pluginId: "json-format", action: "format", input,
+        pluginId: "json-format",
+        action: "format",
+        input,
       });
       setOutput(result);
       setError("");
@@ -36,7 +38,9 @@ export default function JsonTool() {
   const minify = async () => {
     try {
       const result = await invoke<string>("execute_plugin", {
-        pluginId: "json-format", action: "minify", input,
+        pluginId: "json-format",
+        action: "minify",
+        input,
       });
       setOutput(result);
       setError("");
@@ -48,50 +52,64 @@ export default function JsonTool() {
     }
   };
 
-  const validate = () => safe(() => {
-    JSON.parse(input);
-    setOutput("✓ JSON 格式正确");
-    message.success("JSON 格式正确");
-  });
+  const validate = () =>
+    safe(() => {
+      JSON.parse(input);
+      setOutput("✓ JSON 格式正确");
+      message.success("JSON 格式正确");
+    });
 
-  const toCsv = () => safe(() => {
-    const obj = JSON.parse(input);
-    const arr = Array.isArray(obj) ? obj : [obj];
-    if (arr.length === 0) { setOutput(""); return; }
-    const keys = Array.from(new Set(arr.flatMap((o: Record<string, unknown>) => Object.keys(o))));
-    const escapeCsv = (v: unknown) => {
-      const s = v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [keys.join(",")];
-    for (const item of arr) {
-      lines.push(keys.map((k) => escapeCsv((item as Record<string, unknown>)[k])).join(","));
-    }
-    setOutput(lines.join("\n"));
-    message.success("已转为 CSV");
-  });
+  const toCsv = () =>
+    safe(() => {
+      const obj = JSON.parse(input);
+      const arr = Array.isArray(obj) ? obj : [obj];
+      if (arr.length === 0) {
+        setOutput("");
+        return;
+      }
+      const keys = Array.from(new Set(arr.flatMap((o: Record<string, unknown>) => Object.keys(o))));
+      const escapeCsv = (v: unknown) => {
+        const s =
+          v === null || v === undefined
+            ? ""
+            : typeof v === "object"
+              ? JSON.stringify(v)
+              : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [keys.join(",")];
+      for (const item of arr) {
+        lines.push(keys.map((k) => escapeCsv((item as Record<string, unknown>)[k])).join(","));
+      }
+      setOutput(lines.join("\n"));
+      message.success("已转为 CSV");
+    });
 
-  const toYaml = () => safe(() => {
-    const obj = JSON.parse(input);
-    setOutput(jsonToYaml(obj, 0));
-    message.success("已转为 YAML");
-  });
+  const toYaml = () =>
+    safe(() => {
+      const obj = JSON.parse(input);
+      setOutput(jsonToYaml(obj, 0));
+      message.success("已转为 YAML");
+    });
 
   const [pathExpr, setPathExpr] = useState("$.data");
-  const extractPath = () => safe(() => {
-    const obj = JSON.parse(input);
-    const result = jsonPath(obj, pathExpr);
-    setOutput(JSON.stringify(result, null, 2));
-    message.success("提取完成");
-  });
+  const extractPath = () =>
+    safe(() => {
+      const obj = JSON.parse(input);
+      const result = jsonPath(obj, pathExpr);
+      setOutput(JSON.stringify(result, null, 2));
+      message.success("提取完成");
+    });
 
-  const escape = () => safe(() => {
-    setOutput(JSON.stringify(input));
-  });
+  const escape = () =>
+    safe(() => {
+      setOutput(JSON.stringify(input));
+    });
 
-  const unescape = () => safe(() => {
-    setOutput(JSON.parse(`"${input}"`));
-  });
+  const unescape = () =>
+    safe(() => {
+      setOutput(JSON.parse(`"${input}"`));
+    });
 
   return (
     <Card title="JSON 工具" bordered={false}>
@@ -109,12 +127,22 @@ export default function JsonTool() {
                   placeholder='{"name":"test","age":25}'
                 />
                 <Space wrap style={{ margin: "12px 0" }}>
-                  <Button type="primary" onClick={format}>格式化</Button>
+                  <Button type="primary" onClick={format}>
+                    格式化
+                  </Button>
                   <Button onClick={minify}>压缩</Button>
                   <Button onClick={validate}>校验</Button>
                   <Button onClick={escape}>转义</Button>
                   <Button onClick={unescape}>反转义</Button>
-                  <Button onClick={() => { setInput(""); setOutput(""); setError(""); }}>清空</Button>
+                  <Button
+                    onClick={() => {
+                      setInput("");
+                      setOutput("");
+                      setError("");
+                    }}
+                  >
+                    清空
+                  </Button>
                 </Space>
               </>
             ),
@@ -128,12 +156,23 @@ export default function JsonTool() {
                   rows={6}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder='输入 JSON 数组或对象'
+                  placeholder="输入 JSON 数组或对象"
                 />
                 <Space wrap style={{ margin: "12px 0" }}>
-                  <Button type="primary" onClick={toCsv}>JSON → CSV</Button>
-                  <Button type="primary" onClick={toYaml}>JSON → YAML</Button>
-                  <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
+                  <Button type="primary" onClick={toCsv}>
+                    JSON → CSV
+                  </Button>
+                  <Button type="primary" onClick={toYaml}>
+                    JSON → YAML
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setInput("");
+                      setOutput("");
+                    }}
+                  >
+                    清空
+                  </Button>
                 </Space>
               </>
             ),
@@ -149,23 +188,30 @@ export default function JsonTool() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder='{"data":{"users":[{"id":1},{"id":2}]}}'
                 />
-                <Space style={{ margin: "12px 0" }} >
+                <Space style={{ margin: "12px 0" }}>
                   <Input
                     value={pathExpr}
                     onChange={(e) => setPathExpr(e.target.value)}
                     placeholder="$.data.users[*].id"
                     style={{ width: 300 }}
                   />
-                  <Button type="primary" onClick={extractPath}>提取</Button>
+                  <Button type="primary" onClick={extractPath}>
+                    提取
+                  </Button>
                 </Space>
-                <Tag color="blue">支持: $  .key  [index]  [*]  .key1.key2</Tag>
+                <Tag color="blue">支持: $ .key [index] [*] .key1.key2</Tag>
               </>
             ),
           },
         ]}
       />
       {error && <div style={{ color: "red", margin: "8px 0" }}>{error}</div>}
-      <Input.TextArea rows={8} value={output} readOnly style={{ fontFamily: "monospace", background: "#fafafa" }} />
+      <Input.TextArea
+        rows={8}
+        value={output}
+        readOnly
+        style={{ fontFamily: "monospace", background: "#fafafa" }}
+      />
     </Card>
   );
 }
@@ -213,25 +259,29 @@ function jsonToYaml(obj: unknown, indent: number): string {
   if (typeof obj === "number" || typeof obj === "boolean") return String(obj);
   if (Array.isArray(obj)) {
     if (obj.length === 0) return "[]";
-    return obj.map((item) => {
-      const val = jsonToYaml(item, indent + 1);
-      if (typeof item === "object" && item !== null) {
-        const inner = jsonToYaml(item, indent + 1);
-        return `${pad}- ${inner.trimStart()}`;
-      }
-      return `${pad}- ${val}`;
-    }).join("\n");
+    return obj
+      .map((item) => {
+        const val = jsonToYaml(item, indent + 1);
+        if (typeof item === "object" && item !== null) {
+          const inner = jsonToYaml(item, indent + 1);
+          return `${pad}- ${inner.trimStart()}`;
+        }
+        return `${pad}- ${val}`;
+      })
+      .join("\n");
   }
   if (typeof obj === "object") {
     const entries = Object.entries(obj as Record<string, unknown>);
     if (entries.length === 0) return "{}";
-    return entries.map(([key, val]) => {
-      if (val !== null && typeof val === "object") {
-        const nested = jsonToYaml(val, indent + 1);
-        return `${pad}${key}:\n${nested}`;
-      }
-      return `${pad}${key}: ${jsonToYaml(val, indent + 1)}`;
-    }).join("\n");
+    return entries
+      .map(([key, val]) => {
+        if (val !== null && typeof val === "object") {
+          const nested = jsonToYaml(val, indent + 1);
+          return `${pad}${key}:\n${nested}`;
+        }
+        return `${pad}${key}: ${jsonToYaml(val, indent + 1)}`;
+      })
+      .join("\n");
   }
   return String(obj);
 }

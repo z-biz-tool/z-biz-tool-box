@@ -8,7 +8,7 @@ interface CronField {
   max: number;
 }
 
-function parseField(value: string, min: number, max: number, fieldName: string): string {
+function parseField(value: string, _min: number, _max: number, fieldName: string): string {
   if (value === "*") return `每${fieldName}`;
   if (value.startsWith("*/")) {
     const step = parseInt(value.slice(2), 10);
@@ -29,10 +29,18 @@ function parseField(value: string, min: number, max: number, fieldName: string):
   return `无效的${fieldName}`;
 }
 
-function getCronDescription(expr: string): { description: string; nextRuns: Date[]; error?: string } {
+function getCronDescription(expr: string): {
+  description: string;
+  nextRuns: Date[];
+  error?: string;
+} {
   const parts = expr.trim().split(/\s+/);
   if (parts.length < 5 || parts.length > 6) {
-    return { description: "", nextRuns: [], error: "Cron 表达式必须有 5 或 6 个字段（分 时 日 月 周 [秒]）" };
+    return {
+      description: "",
+      nextRuns: [],
+      error: "Cron 表达式必须有 5 或 6 个字段（分 时 日 月 周 [秒]）",
+    };
   }
 
   const hasSeconds = parts.length === 6;
@@ -50,7 +58,16 @@ function getCronDescription(expr: string): { description: string; nextRuns: Date
   const descMonth = parseField(month, 1, 12, "月");
   const descWeek = parseField(dayOfWeek, 0, 7, "周");
 
-  const weekMap: Record<string, string> = { "0": "日", "1": "一", "2": "二", "3": "三", "4": "四", "5": "五", "6": "六", "7": "日" };
+  const weekMap: Record<string, string> = {
+    "0": "日",
+    "1": "一",
+    "2": "二",
+    "3": "三",
+    "4": "四",
+    "5": "五",
+    "6": "六",
+    "7": "日",
+  };
   let descWeekZh = descWeek;
   if (/^[0-7]$/.test(dayOfWeek)) {
     descWeekZh = `每周${weekMap[dayOfWeek] || dayOfWeek}`;
@@ -60,7 +77,20 @@ function getCronDescription(expr: string): { description: string; nextRuns: Date
     descWeekZh = `每${dayOfWeek.slice(2)}周`;
   }
 
-  const monthMap: Record<string, string> = { "1": "一月", "2": "二月", "3": "三月", "4": "四月", "5": "五月", "6": "六月", "7": "七月", "8": "八月", "9": "九月", "10": "十月", "11": "十一月", "12": "十二月" };
+  const monthMap: Record<string, string> = {
+    "1": "一月",
+    "2": "二月",
+    "3": "三月",
+    "4": "四月",
+    "5": "五月",
+    "6": "六月",
+    "7": "七月",
+    "8": "八月",
+    "9": "九月",
+    "10": "十月",
+    "11": "十一月",
+    "12": "十二月",
+  };
   let descMonthZh = descMonth;
   if (/^[1-9]$|^1[0-2]$/.test(month)) {
     descMonthZh = monthMap[month] || month;
@@ -137,18 +167,25 @@ export default function CronParser() {
             {fields.map((f) => (
               <Col span={4} key={f.name}>
                 <Card size="small" type="inner" title={f.name} styles={{ body: { padding: 8 } }}>
-                  <Tag color="blue" style={{ fontFamily: "monospace" }}>{f.value}</Tag>
+                  <Tag color="blue" style={{ fontFamily: "monospace" }}>
+                    {f.value}
+                  </Tag>
                 </Card>
               </Col>
             ))}
           </Row>
           <Card size="small" type="inner" title="字段说明">
             <Space wrap>
-              <Tag>*</Tag><span>任意值</span>
-              <Tag>*/N</Tag><span>每 N 个</span>
-              <Tag>A-B</Tag><span>范围 A 到 B</span>
-              <Tag>A,B,C</Tag><span>列表</span>
-              <Tag>A</Tag><span>具体值</span>
+              <Tag>*</Tag>
+              <span>任意值</span>
+              <Tag>*/N</Tag>
+              <span>每 N 个</span>
+              <Tag>A-B</Tag>
+              <span>范围 A 到 B</span>
+              <Tag>A,B,C</Tag>
+              <span>列表</span>
+              <Tag>A</Tag>
+              <span>具体值</span>
             </Space>
           </Card>
         </>

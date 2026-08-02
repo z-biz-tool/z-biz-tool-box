@@ -8,17 +8,15 @@ function ipToInt(ip: string): number | null {
 }
 
 function intToIp(int: number): string {
-  return [
-    (int >>> 24) & 255,
-    (int >>> 16) & 255,
-    (int >>> 8) & 255,
-    int & 255,
-  ].join(".");
+  return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join(".");
 }
 
 function countBits(n: number): number {
   let count = 0;
-  while (n) { count += n & 1; n >>>= 1; }
+  while (n) {
+    count += n & 1;
+    n >>>= 1;
+  }
   return count;
 }
 
@@ -31,7 +29,7 @@ function maskToInt(mask: string): number | null {
   const int = ipToInt(mask);
   if (int === null) return null;
   // 验证是否为合法掩码（连续 1 后跟连续 0）
-  const inverted = (~int) >>> 0;
+  const inverted = ~int >>> 0;
   const isValid = (inverted & (inverted + 1)) === 0;
   return isValid ? int : null;
 }
@@ -83,25 +81,39 @@ export default function IpTool() {
   const calculate = () => {
     setError("");
     const ipInt = ipToInt(ip);
-    if (ipInt === null) { setError("无效的 IP 地址"); setResult(null); return; }
+    if (ipInt === null) {
+      setError("无效的 IP 地址");
+      setResult(null);
+      return;
+    }
 
     let maskInt: number | null;
     if (mask) {
       maskInt = maskToInt(mask);
-      if (maskInt === null) { setError("无效的子网掩码"); setResult(null); return; }
+      if (maskInt === null) {
+        setError("无效的子网掩码");
+        setResult(null);
+        return;
+      }
       const bits = countBits(maskInt);
       setCidr(String(bits));
     } else if (cidr) {
       const cidrNum = parseInt(cidr, 10);
-      if (isNaN(cidrNum) || cidrNum < 0 || cidrNum > 32) { setError("无效的 CIDR"); setResult(null); return; }
+      if (isNaN(cidrNum) || cidrNum < 0 || cidrNum > 32) {
+        setError("无效的 CIDR");
+        setResult(null);
+        return;
+      }
       maskInt = maskFromCidr(cidrNum);
       setMask(intToIp(maskInt));
     } else {
-      setError("请输入子网掩码或 CIDR"); setResult(null); return;
+      setError("请输入子网掩码或 CIDR");
+      setResult(null);
+      return;
     }
 
     const network = (ipInt & maskInt) >>> 0;
-    const wildcard = (~maskInt) >>> 0;
+    const wildcard = ~maskInt >>> 0;
     const broadcast = (network | wildcard) >>> 0;
     const totalHosts = wildcard + 1;
     const usableHosts = totalHosts > 2 ? totalHosts - 2 : totalHosts;
@@ -147,7 +159,9 @@ export default function IpTool() {
           placeholder="CIDR"
           style={{ width: 60, fontFamily: "monospace" }}
         />
-        <Button type="primary" onClick={calculate}>计算</Button>
+        <Button type="primary" onClick={calculate}>
+          计算
+        </Button>
       </Space>
       {error && <Alert type="error" message={error} style={{ marginBottom: 12 }} />}
       {result && (
@@ -155,12 +169,20 @@ export default function IpTool() {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="网络地址" value={result.network} valueStyle={{ fontFamily: "monospace", fontSize: 16 }} />
+                <Statistic
+                  title="网络地址"
+                  value={result.network}
+                  valueStyle={{ fontFamily: "monospace", fontSize: 16 }}
+                />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="广播地址" value={result.broadcast} valueStyle={{ fontFamily: "monospace", fontSize: 16 }} />
+                <Statistic
+                  title="广播地址"
+                  value={result.broadcast}
+                  valueStyle={{ fontFamily: "monospace", fontSize: 16 }}
+                />
               </Card>
             </Col>
             <Col span={6}>
@@ -177,17 +199,29 @@ export default function IpTool() {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="第一个主机" value={result.hostMin} valueStyle={{ fontFamily: "monospace", fontSize: 14 }} />
+                <Statistic
+                  title="第一个主机"
+                  value={result.hostMin}
+                  valueStyle={{ fontFamily: "monospace", fontSize: 14 }}
+                />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="最后主机" value={result.hostMax} valueStyle={{ fontFamily: "monospace", fontSize: 14 }} />
+                <Statistic
+                  title="最后主机"
+                  value={result.hostMax}
+                  valueStyle={{ fontFamily: "monospace", fontSize: 14 }}
+                />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="通配符掩码" value={result.wildcard} valueStyle={{ fontFamily: "monospace", fontSize: 14 }} />
+                <Statistic
+                  title="通配符掩码"
+                  value={result.wildcard}
+                  valueStyle={{ fontFamily: "monospace", fontSize: 14 }}
+                />
               </Card>
             </Col>
             <Col span={6}>
@@ -198,11 +232,17 @@ export default function IpTool() {
           </Row>
           <Card size="small" type="inner" title="属性">
             <Space wrap>
-              {result.privateType ? <Tag color="orange">私有地址 ({result.privateType})</Tag> : <Tag color="blue">公网地址</Tag>}
+              {result.privateType ? (
+                <Tag color="orange">私有地址 ({result.privateType})</Tag>
+              ) : (
+                <Tag color="blue">公网地址</Tag>
+              )}
               {result.isNetwork && <Tag color="purple">网络地址</Tag>}
               {result.isBroadcast && <Tag color="red">广播地址</Tag>}
               {result.isHost && <Tag color="green">主机地址</Tag>}
-              <Tag color="cyan">CIDR: {ip}/{cidr}</Tag>
+              <Tag color="cyan">
+                CIDR: {ip}/{cidr}
+              </Tag>
             </Space>
           </Card>
         </>

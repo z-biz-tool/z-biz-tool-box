@@ -14,10 +14,15 @@ export default function HexTool() {
       if (mode === "string") {
         // 按 UTF-8 字节编码
         const bytes = new TextEncoder().encode(input);
-        hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+        hex = Array.from(bytes)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(" ");
       } else {
         // 把输入当作空格分隔的十进制字节
-        const bytes = input.trim().split(/\s+/).map((s) => parseInt(s, 10));
+        const bytes = input
+          .trim()
+          .split(/\s+/)
+          .map((s) => parseInt(s, 10));
         hex = bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
       }
       setOutput(hex.toUpperCase());
@@ -50,7 +55,11 @@ export default function HexTool() {
 
   return (
     <Card title="Hex 十六进制编解码" bordered={false}>
-      <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} style={{ marginBottom: 12 }}>
+      <Radio.Group
+        value={mode}
+        onChange={(e) => setMode(e.target.value)}
+        style={{ marginBottom: 12 }}
+      >
         <Radio.Button value="string">字符串→Hex</Radio.Button>
         <Radio.Button value="bytes">字节→Hex</Radio.Button>
       </Radio.Group>
@@ -75,10 +84,21 @@ export default function HexTool() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={encode}>编码</Button>
+        <Button type="primary" onClick={encode}>
+          编码
+        </Button>
         <Button onClick={decode}>解码</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={copyOut} disabled={!output}>复制结果</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button onClick={copyOut} disabled={!output}>
+          复制结果
+        </Button>
       </Space>
     </Card>
   );

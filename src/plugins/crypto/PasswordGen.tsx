@@ -1,5 +1,19 @@
 import { useState } from "react";
-import { Card, Slider, Checkbox, Button, Space, Input, Progress, Tag, List, Typography, Row, Col, message } from "antd";
+import {
+  Card,
+  Slider,
+  Checkbox,
+  Button,
+  Space,
+  Input,
+  Progress,
+  Tag,
+  List,
+  Typography,
+  Row,
+  Col,
+  message,
+} from "antd";
 
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -15,7 +29,12 @@ interface CharSets {
 
 export default function PasswordGen() {
   const [length, setLength] = useState(16);
-  const [charSets, setCharSets] = useState<CharSets>({ lower: true, upper: true, number: true, symbol: true });
+  const [charSets, setCharSets] = useState<CharSets>({
+    lower: true,
+    upper: true,
+    number: true,
+    symbol: true,
+  });
   const [excludeAmbiguous, setExcludeAmbiguous] = useState(false);
   const [password, setPassword] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -70,7 +89,9 @@ export default function PasswordGen() {
       <Row gutter={16}>
         <Col span={16}>
           <div style={{ marginBottom: 8 }}>
-            <span>密码长度: <Tag color="blue">{length}</Tag></span>
+            <span>
+              密码长度: <Tag color="blue">{length}</Tag>
+            </span>
           </div>
           <Slider min={4} max={64} value={length} onChange={setLength} />
         </Col>
@@ -108,9 +129,18 @@ export default function PasswordGen() {
         </Checkbox>
       </Space>
       <Space style={{ marginBottom: 12 }}>
-        <Button type="primary" onClick={generate}>生成密码</Button>
+        <Button type="primary" onClick={generate}>
+          生成密码
+        </Button>
         <Button onClick={() => generate()}>刷新</Button>
-        <Button onClick={() => { setPassword(""); setStrength(0); }}>清空</Button>
+        <Button
+          onClick={() => {
+            setPassword("");
+            setStrength(0);
+          }}
+        >
+          清空
+        </Button>
       </Space>
       {password && (
         <div style={{ marginBottom: 16 }}>
@@ -123,11 +153,26 @@ export default function PasswordGen() {
           />
           <div style={{ marginTop: 8 }}>
             <span style={{ marginRight: 8 }}>强度:</span>
-            <Progress percent={strength} strokeColor={strengthColor} style={{ width: 200, display: "inline-flex" }} />
-            <Tag color={strength < 40 ? "red" : strength < 70 ? "orange" : "green"} style={{ marginLeft: 8 }}>
-              {strengthLabel} (熵 ~{Math.round(password.length * Math.log2(
-                (charSets.lower ? 26 : 0) + (charSets.upper ? 26 : 0) + (charSets.number ? 10 : 0) + (charSets.symbol ? 26 : 0) || 1
-              ))} bits)
+            <Progress
+              percent={strength}
+              strokeColor={strengthColor}
+              style={{ width: 200, display: "inline-flex" }}
+            />
+            <Tag
+              color={strength < 40 ? "red" : strength < 70 ? "orange" : "green"}
+              style={{ marginLeft: 8 }}
+            >
+              {strengthLabel} (熵 ~
+              {Math.round(
+                password.length *
+                  Math.log2(
+                    (charSets.lower ? 26 : 0) +
+                      (charSets.upper ? 26 : 0) +
+                      (charSets.number ? 10 : 0) +
+                      (charSets.symbol ? 26 : 0) || 1
+                  )
+              )}{" "}
+              bits)
             </Tag>
           </div>
         </div>
@@ -140,7 +185,9 @@ export default function PasswordGen() {
             renderItem={(item, index) => (
               <List.Item
                 actions={[
-                  <Button size="small" onClick={() => copy(item)}>复制</Button>,
+                  <Button size="small" onClick={() => copy(item)}>
+                    复制
+                  </Button>,
                 ]}
               >
                 <Typography.Text code style={{ fontFamily: "monospace" }}>

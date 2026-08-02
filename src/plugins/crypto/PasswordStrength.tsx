@@ -51,7 +51,8 @@ function analyze(pwd: string): Analysis {
   const issues: string[] = [];
   if (length === 0) issues.push("密码为空");
   if (length > 0 && length < 8) issues.push("密码太短（建议至少 8 位）");
-  if (/^(password|123456|qwerty|abc123|admin|letmein|welcome|monkey|dragon)/i.test(pwd)) issues.push("常见弱密码");
+  if (/^(password|123456|qwerty|abc123|admin|letmein|welcome|monkey|dragon)/i.test(pwd))
+    issues.push("常见弱密码");
   if (/^(\d+|[a-z]+)$/i.test(pwd) && length > 0) issues.push("仅包含单一类型字符");
   if (/(.)\1{2,}/.test(pwd)) issues.push("包含连续重复字符");
   if (/^(0123456|1234567|abcdefg|qwerty)/i.test(pwd)) issues.push("包含连续序列");
@@ -64,7 +65,10 @@ function analyze(pwd: string): Analysis {
   if (length >= 4) {
     for (let i = 1; i <= length / 2; i++) {
       const pattern = pwd.substr(0, i);
-      if (pattern.repeat(Math.floor(length / i)) === pwd.substr(0, pattern.length * Math.floor(length / i))) {
+      if (
+        pattern.repeat(Math.floor(length / i)) ===
+        pwd.substr(0, pattern.length * Math.floor(length / i))
+      ) {
         if (i < length / 2) issues.push("检测到重复模式");
         break;
       }
@@ -72,13 +76,37 @@ function analyze(pwd: string): Analysis {
   }
 
   let level: string, color: string;
-  if (score < 30) { level = "非常弱"; color = "#ff4d4f"; }
-  else if (score < 50) { level = "弱"; color = "#fa8c16"; }
-  else if (score < 70) { level = "中等"; color = "#faad14"; }
-  else if (score < 85) { level = "强"; color = "#52c41a"; }
-  else { level = "非常强"; color = "#13c2c2"; }
+  if (score < 30) {
+    level = "非常弱";
+    color = "#ff4d4f";
+  } else if (score < 50) {
+    level = "弱";
+    color = "#fa8c16";
+  } else if (score < 70) {
+    level = "中等";
+    color = "#faad14";
+  } else if (score < 85) {
+    level = "强";
+    color = "#52c41a";
+  } else {
+    level = "非常强";
+    color = "#13c2c2";
+  }
 
-  return { length, hasLower, hasUpper, hasNumber, hasSymbol, hasSpace, uniqueChars, entropy, score, level, color, issues };
+  return {
+    length,
+    hasLower,
+    hasUpper,
+    hasNumber,
+    hasSymbol,
+    hasSpace,
+    uniqueChars,
+    entropy,
+    score,
+    level,
+    color,
+    issues,
+  };
 }
 
 export default function PasswordStrength() {
@@ -105,7 +133,12 @@ export default function PasswordStrength() {
               {analysis.level}
             </Tag>
           </div>
-          <Progress percent={analysis.score} strokeColor={analysis.color} strokeWidth={16} style={{ marginBottom: 16 }} />
+          <Progress
+            percent={analysis.score}
+            strokeColor={analysis.color}
+            strokeWidth={16}
+            style={{ marginBottom: 16 }}
+          />
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Statistic title="密码长度" value={analysis.length} />
@@ -117,7 +150,18 @@ export default function PasswordStrength() {
               <Statistic title="熵值" value={analysis.entropy} suffix="bits" />
             </Col>
             <Col span={6}>
-              <Statistic title="破解难度" value={analysis.entropy > 100 ? "极高" : analysis.entropy > 60 ? "高" : analysis.entropy > 36 ? "中" : "低"} />
+              <Statistic
+                title="破解难度"
+                value={
+                  analysis.entropy > 100
+                    ? "极高"
+                    : analysis.entropy > 60
+                      ? "高"
+                      : analysis.entropy > 36
+                        ? "中"
+                        : "低"
+                }
+              />
             </Col>
           </Row>
           <Row gutter={16} style={{ marginBottom: 16 }}>

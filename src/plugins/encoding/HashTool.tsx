@@ -72,15 +72,19 @@ export default function HashTool() {
         placeholder="输入要计算哈希的文本"
       />
       <Space style={{ margin: "12px 0" }}>
-        <Select
-          value={algo}
-          onChange={setAlgo}
-          options={ALGORITHMS}
-          style={{ width: 200 }}
-        />
-        <Button type="primary" onClick={generate}>计算</Button>
+        <Select value={algo} onChange={setAlgo} options={ALGORITHMS} style={{ width: 200 }} />
+        <Button type="primary" onClick={generate}>
+          计算
+        </Button>
         <Button onClick={generateAll}>计算全部算法</Button>
-        <Button onClick={() => { setInput(""); setResults({}); }}>清空</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setResults({});
+          }}
+        >
+          清空
+        </Button>
       </Space>
       <Row gutter={[16, 16]}>
         {ALGORITHMS.map((a) => (
@@ -97,10 +101,27 @@ export default function HashTool() {
                   />
                 </Col>
                 <Col>
-                  <Statistic title="位数" value={a.value === "md5" ? 128 : a.value.includes("256") ? 256 : a.value.includes("384") ? 384 : a.value.includes("512") ? 512 : 160} />
+                  <Statistic
+                    title="位数"
+                    value={
+                      a.value === "md5"
+                        ? 128
+                        : a.value.includes("256")
+                          ? 256
+                          : a.value.includes("384")
+                            ? 384
+                            : a.value.includes("512")
+                              ? 512
+                              : 160
+                    }
+                  />
                 </Col>
                 <Col>
-                  <Button size="small" onClick={() => results[a.value] && copy(results[a.value])} disabled={!results[a.value]}>
+                  <Button
+                    size="small"
+                    onClick={() => results[a.value] && copy(results[a.value])}
+                    disabled={!results[a.value]}
+                  >
                     复制
                   </Button>
                 </Col>
@@ -131,23 +152,63 @@ function md5(string: string): string {
     }
     return result ^ x8 ^ y8;
   }
-  function F(x: number, y: number, z: number): number { return (x & y) | (~x & z); }
-  function G(x: number, y: number, z: number): number { return (x & z) | (y & ~z); }
-  function H(x: number, y: number, z: number): number { return x ^ y ^ z; }
-  function I(x: number, y: number, z: number): number { return y ^ (x | ~z); }
-  function FF(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
+  function F(x: number, y: number, z: number): number {
+    return (x & y) | (~x & z);
+  }
+  function G(x: number, y: number, z: number): number {
+    return (x & z) | (y & ~z);
+  }
+  function H(x: number, y: number, z: number): number {
+    return x ^ y ^ z;
+  }
+  function I(x: number, y: number, z: number): number {
+    return y ^ (x | ~z);
+  }
+  function FF(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    x: number,
+    s: number,
+    ac: number
+  ): number {
     a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac));
     return addUnsigned(rotateLeft(a, s), b);
   }
-  function GG(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
+  function GG(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    x: number,
+    s: number,
+    ac: number
+  ): number {
     a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac));
     return addUnsigned(rotateLeft(a, s), b);
   }
-  function HH(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
+  function HH(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    x: number,
+    s: number,
+    ac: number
+  ): number {
     a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac));
     return addUnsigned(rotateLeft(a, s), b);
   }
-  function II(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
+  function II(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    x: number,
+    s: number,
+    ac: number
+  ): number {
     a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac));
     return addUnsigned(rotateLeft(a, s), b);
   }
@@ -177,12 +238,14 @@ function md5(string: string): string {
   }
 
   const x: number[] = convertToWordArray(string);
-  let a = 0x67452301, b = 0xefcdab89, c = 0x98badcfe, d = 0x10325476;
+  let a = 0x67452301,
+    b = 0xefcdab89,
+    c = 0x98badcfe,
+    d = 0x10325476;
   const S = [
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9,
+    14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21,
+    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
   ];
   const K = [
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -195,7 +258,10 @@ function md5(string: string): string {
     0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
   ];
   for (let i = 0; i < x.length; i += 16) {
-    const aa = a, bb = b, cc = c, dd = d;
+    const aa = a,
+      bb = b,
+      cc = c,
+      dd = d;
     for (let j = 0; j < 64; j++) {
       const g = j < 16 ? j : j < 32 ? (5 * j + 1) % 16 : j < 48 ? (3 * j + 5) % 16 : (7 * j) % 16;
       if (j < 16) a = FF(a, b, c, d, x[i + g], S[j], K[j]);

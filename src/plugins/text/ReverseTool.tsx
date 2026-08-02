@@ -30,7 +30,11 @@ export default function ReverseTool() {
 
   return (
     <Card title="文本翻转" bordered={false}>
-      <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} style={{ marginBottom: 12 }}>
+      <Radio.Group
+        value={mode}
+        onChange={(e) => setMode(e.target.value)}
+        style={{ marginBottom: 12 }}
+      >
         <Radio.Button value="chars">字符翻转</Radio.Button>
         <Radio.Button value="charsAll">码元翻转</Radio.Button>
         <Radio.Button value="words">单词翻转</Radio.Button>
@@ -57,9 +61,26 @@ export default function ReverseTool() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={reverse}>翻转</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={() => { navigator.clipboard.writeText(output); message.success("已复制"); }} disabled={!output}>复制结果</Button>
+        <Button type="primary" onClick={reverse}>
+          翻转
+        </Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button
+          onClick={() => {
+            navigator.clipboard.writeText(output);
+            message.success("已复制");
+          }}
+          disabled={!output}
+        >
+          复制结果
+        </Button>
       </Space>
     </Card>
   );

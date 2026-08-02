@@ -24,13 +24,17 @@ export default function UrlTool() {
   const encodeAll = () => {
     // 对所有字符进行编码（包括中文等）
     try {
-      setOutput(Array.from(input).map((c) => {
-        const code = c.codePointAt(0)!;
-        if (code < 128) {
-          return "%" + code.toString(16).toUpperCase().padStart(2, "0");
-        }
-        return encodeURIComponent(c);
-      }).join(""));
+      setOutput(
+        Array.from(input)
+          .map((c) => {
+            const code = c.codePointAt(0)!;
+            if (code < 128) {
+              return "%" + code.toString(16).toUpperCase().padStart(2, "0");
+            }
+            return encodeURIComponent(c);
+          })
+          .join("")
+      );
     } catch {
       message.error("编码失败");
     }
@@ -64,11 +68,22 @@ export default function UrlTool() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={encode}>编码</Button>
+        <Button type="primary" onClick={encode}>
+          编码
+        </Button>
         <Button onClick={encodeAll}>全量编码</Button>
         <Button onClick={decode}>解码</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={copyOut} disabled={!output}>复制结果</Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button onClick={copyOut} disabled={!output}>
+          复制结果
+        </Button>
       </Space>
     </Card>
   );

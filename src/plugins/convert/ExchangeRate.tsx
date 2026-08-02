@@ -26,10 +26,26 @@ const CURRENCIES: Record<string, { name: string; symbol: string; flag: string }>
 
 // 离线参考汇率（以 USD 为基准，仅供演示）
 const OFFLINE_RATES: Record<string, number> = {
-  USD: 1, EUR: 0.92, GBP: 0.79, JPY: 149.5, CNY: 7.24, KRW: 1335,
-  HKD: 7.82, TWD: 31.8, AUD: 1.52, CAD: 1.36, CHF: 0.88, SGD: 1.35,
-  RUB: 92.5, INR: 83.2, BRL: 4.95, THB: 35.8, MYR: 4.65, PHP: 56.3,
-  VND: 24300, IDR: 15800,
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  JPY: 149.5,
+  CNY: 7.24,
+  KRW: 1335,
+  HKD: 7.82,
+  TWD: 31.8,
+  AUD: 1.52,
+  CAD: 1.36,
+  CHF: 0.88,
+  SGD: 1.35,
+  RUB: 92.5,
+  INR: 83.2,
+  BRL: 4.95,
+  THB: 35.8,
+  MYR: 4.65,
+  PHP: 56.3,
+  VND: 24300,
+  IDR: 15800,
 };
 
 export default function ExchangeRate() {
@@ -75,7 +91,6 @@ export default function ExchangeRate() {
 
   const result = convert();
   const inverseRate = (rates[from] || 1) / (rates[to] || 1);
-  const fromInfo = CURRENCIES[from];
   const toInfo = CURRENCIES[to];
 
   return (
@@ -84,7 +99,9 @@ export default function ExchangeRate() {
         <Tag color={source === "online" ? "green" : "orange"}>
           {source === "online" ? "在线汇率" : "离线参考汇率"}
         </Tag>
-        <a onClick={fetchRates} style={{ fontSize: 12 }}>{loading ? "更新中..." : "刷新汇率"}</a>
+        <a onClick={fetchRates} style={{ fontSize: 12 }}>
+          {loading ? "更新中..." : "刷新汇率"}
+        </a>
       </Space>
       <Alert
         type="info"
@@ -135,7 +152,13 @@ export default function ExchangeRate() {
         </Col>
       </Row>
       <Space style={{ margin: "12px 0" }}>
-        <button onClick={() => { setFrom(to); setTo(from); }} style={{ cursor: "pointer", padding: "4px 12px" }}>
+        <button
+          onClick={() => {
+            setFrom(to);
+            setTo(from);
+          }}
+          style={{ cursor: "pointer", padding: "4px 12px" }}
+        >
           ⇄ 交换
         </button>
       </Space>
@@ -157,11 +180,7 @@ export default function ExchangeRate() {
           />
         </Col>
         <Col span={12}>
-          <Statistic
-            title={`1 ${to} =`}
-            value={Number(inverseRate.toFixed(4))}
-            suffix={from}
-          />
+          <Statistic title={`1 ${to} =`} value={Number(inverseRate.toFixed(4))} suffix={from} />
         </Col>
       </Row>
     </Card>

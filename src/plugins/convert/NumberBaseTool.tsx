@@ -11,7 +11,12 @@ const BASE_INFO: Record<Base, { radix: number; label: string; color: string }> =
 };
 
 export default function NumberBaseTool() {
-  const [values, setValues] = useState<Record<Base, string>>({ bin: "", oct: "", dec: "0", hex: "" });
+  const [values, setValues] = useState<Record<Base, string>>({
+    bin: "",
+    oct: "",
+    dec: "0",
+    hex: "",
+  });
   const [error, setError] = useState("");
 
   const convert = (from: Base, value: string) => {
@@ -23,7 +28,14 @@ export default function NumberBaseTool() {
     }
     const radix = BASE_INFO[from].radix;
     const cleaned = value.trim().replace(/^0x/i, "").replace(/^0b/i, "").replace(/^0o/i, "");
-    const validChars = from === "bin" ? /^[01]+$/ : from === "oct" ? /^[0-7]+$/ : from === "dec" ? /^-?\d+$/ : /^[0-9a-fA-F]+$/;
+    const validChars =
+      from === "bin"
+        ? /^[01]+$/
+        : from === "oct"
+          ? /^[0-7]+$/
+          : from === "dec"
+            ? /^-?\d+$/
+            : /^[0-9a-fA-F]+$/;
     if (!validChars.test(cleaned)) {
       setError(`${BASE_INFO[from].label}输入无效`);
       setValues(newValues);
@@ -57,14 +69,20 @@ export default function NumberBaseTool() {
       <Space style={{ marginBottom: 16 }}>
         <span>快捷示例:</span>
         {presets.map((n) => (
-          <Tag key={n} style={{ cursor: "pointer" }} onClick={() => convert("dec", String(n))}>{n}</Tag>
+          <Tag key={n} style={{ cursor: "pointer" }} onClick={() => convert("dec", String(n))}>
+            {n}
+          </Tag>
         ))}
       </Space>
       {error && <div style={{ color: "red", marginBottom: 12 }}>{error}</div>}
       <Row gutter={[16, 16]}>
         {(Object.keys(BASE_INFO) as Base[]).map((base) => (
           <Col span={24} key={base}>
-            <Card size="small" type="inner" title={<Tag color={BASE_INFO[base].color}>{BASE_INFO[base].label}</Tag>}>
+            <Card
+              size="small"
+              type="inner"
+              title={<Tag color={BASE_INFO[base].color}>{BASE_INFO[base].label}</Tag>}
+            >
               <Space.Compact style={{ width: "100%" }}>
                 <Input
                   value={values[base]}
@@ -75,7 +93,13 @@ export default function NumberBaseTool() {
                 <button
                   type="button"
                   onClick={() => values[base] && copy(values[base])}
-                  style={{ padding: "0 16px", border: "1px solid #d9d9d9", borderLeft: "none", cursor: "pointer", background: "#fafafa" }}
+                  style={{
+                    padding: "0 16px",
+                    border: "1px solid #d9d9d9",
+                    borderLeft: "none",
+                    cursor: "pointer",
+                    background: "#fafafa",
+                  }}
                 >
                   复制
                 </button>
@@ -84,7 +108,10 @@ export default function NumberBaseTool() {
           </Col>
         ))}
       </Row>
-      <Radio.Group style={{ marginTop: 16 }} onChange={(e) => convert("dec", String(e.target.value))}>
+      <Radio.Group
+        style={{ marginTop: 16 }}
+        onChange={(e) => convert("dec", String(e.target.value))}
+      >
         <Radio.Button value={0}>0</Radio.Button>
         <Radio.Button value={1}>1</Radio.Button>
         <Radio.Button value={-1}>-1</Radio.Button>

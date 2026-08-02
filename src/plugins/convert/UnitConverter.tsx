@@ -101,15 +101,15 @@ function convert(value: number, from: string, to: string, category: Category): n
     // 特殊处理温度
     let celsius: number;
     if (from === "C") celsius = value;
-    else if (from === "F") celsius = (value - 32) * 5 / 9;
+    else if (from === "F") celsius = ((value - 32) * 5) / 9;
     else if (from === "K") celsius = value - 273.15;
-    else if (from === "R") celsius = (value - 491.67) * 5 / 9;
+    else if (from === "R") celsius = ((value - 491.67) * 5) / 9;
     else celsius = value;
 
     if (to === "C") return celsius;
-    if (to === "F") return celsius * 9 / 5 + 32;
+    if (to === "F") return (celsius * 9) / 5 + 32;
     if (to === "K") return celsius + 273.15;
-    if (to === "R") return (celsius + 273.15) * 9 / 5;
+    if (to === "R") return ((celsius + 273.15) * 9) / 5;
     return celsius;
   }
   const units = UNITS[category];
@@ -132,9 +132,10 @@ export default function UnitConverter() {
   };
 
   const result = convert(value, fromUnit, toUnit, category);
-  const resultStr = Math.abs(result) < 0.0001 || Math.abs(result) > 1e10
-    ? result.toExponential(6)
-    : Number(result.toPrecision(10)).toString();
+  const resultStr =
+    Math.abs(result) < 0.0001 || Math.abs(result) > 1e10
+      ? result.toExponential(6)
+      : Number(result.toPrecision(10)).toString();
 
   const copyResult = () => {
     navigator.clipboard.writeText(resultStr);
@@ -183,7 +184,12 @@ export default function UnitConverter() {
           />
         </Col>
       </Row>
-      <Card size="small" type="inner" style={{ marginTop: 16, cursor: "pointer" }} onClick={copyResult}>
+      <Card
+        size="small"
+        type="inner"
+        style={{ marginTop: 16, cursor: "pointer" }}
+        onClick={copyResult}
+      >
         <Statistic
           title="结果 (点击复制)"
           value={resultStr}
@@ -191,14 +197,16 @@ export default function UnitConverter() {
         />
       </Card>
       <Space wrap style={{ marginTop: 16 }}>
-        {UNITS[category].filter((u) => u.unit !== fromUnit && u.unit !== toUnit).map((u) => (
-          <Statistic
-            key={u.unit}
-            title={u.label.split(" ")[0]}
-            value={Number(convert(value, fromUnit, u.unit, category).toPrecision(8))}
-            valueStyle={{ fontSize: 14 }}
-          />
-        ))}
+        {UNITS[category]
+          .filter((u) => u.unit !== fromUnit && u.unit !== toUnit)
+          .map((u) => (
+            <Statistic
+              key={u.unit}
+              title={u.label.split(" ")[0]}
+              value={Number(convert(value, fromUnit, u.unit, category).toPrecision(8))}
+              valueStyle={{ fontSize: 14 }}
+            />
+          ))}
       </Space>
     </Card>
   );

@@ -31,11 +31,19 @@ export default function SortTool() {
       case "natural":
         // 自然排序（数字部分按数值比较）
         result.sort((a, b) => {
-          const ax: (string | number)[] = [], bx: (string | number)[] = [];
-          a.replace(/(\d+)|(\D+)/g, (_, $1, $2) => { ax.push($1 ? parseInt($1, 10) : $2); return ""; });
-          b.replace(/(\d+)|(\D+)/g, (_, $1, $2) => { bx.push($1 ? parseInt($1, 10) : $2); return ""; });
+          const ax: (string | number)[] = [],
+            bx: (string | number)[] = [];
+          a.replace(/(\d+)|(\D+)/g, (_, $1, $2) => {
+            ax.push($1 ? parseInt($1, 10) : $2);
+            return "";
+          });
+          b.replace(/(\d+)|(\D+)/g, (_, $1, $2) => {
+            bx.push($1 ? parseInt($1, 10) : $2);
+            return "";
+          });
           while (ax.length && bx.length) {
-            const an = ax.shift()!, bn = bx.shift()!;
+            const an = ax.shift()!,
+              bn = bx.shift()!;
             const nn = (typeof an === "number" ? 1 : 0) - (typeof bn === "number" ? 1 : 0);
             if (nn) return nn;
             if (an < bn) return -1;
@@ -51,7 +59,11 @@ export default function SortTool() {
 
   return (
     <Card title="文本排序" bordered={false}>
-      <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} style={{ marginBottom: 12 }}>
+      <Radio.Group
+        value={mode}
+        onChange={(e) => setMode(e.target.value)}
+        style={{ marginBottom: 12 }}
+      >
         <Radio.Button value="asc">升序 A→Z</Radio.Button>
         <Radio.Button value="desc">降序 Z→A</Radio.Button>
         <Radio.Button value="natural">自然排序</Radio.Button>
@@ -65,11 +77,33 @@ export default function SortTool() {
         placeholder="每行一条，输入要排序的文本"
       />
       <Space style={{ margin: "12px 0" }}>
-        <Button type="primary" onClick={sort}>排序</Button>
-        <Button onClick={() => { setInput(""); setOutput(""); }}>清空</Button>
-        <Button onClick={() => { navigator.clipboard.writeText(output); message.success("已复制"); }} disabled={!output}>复制结果</Button>
+        <Button type="primary" onClick={sort}>
+          排序
+        </Button>
+        <Button
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </Button>
+        <Button
+          onClick={() => {
+            navigator.clipboard.writeText(output);
+            message.success("已复制");
+          }}
+          disabled={!output}
+        >
+          复制结果
+        </Button>
       </Space>
-      <Input.TextArea rows={6} value={output} readOnly style={{ fontFamily: "monospace", background: "#fafafa" }} />
+      <Input.TextArea
+        rows={6}
+        value={output}
+        readOnly
+        style={{ fontFamily: "monospace", background: "#fafafa" }}
+      />
     </Card>
   );
 }

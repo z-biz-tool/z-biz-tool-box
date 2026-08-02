@@ -27,8 +27,7 @@ export const useUiStore = create<UiState>()(
       starred: [],
       recent: [],
 
-      toggleTheme: () =>
-        set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
+      toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setTheme: (t) => set({ theme: t }),
 
       toggleStar: (key) =>

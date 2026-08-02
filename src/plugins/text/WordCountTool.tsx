@@ -9,8 +9,18 @@ export default function WordCountTool() {
     const charsNoSpace = input.replace(/\s/g, "").length;
     const words = input.trim() ? input.trim().split(/\s+/).length : 0;
     const lines = input ? input.split("\n").length : 0;
-    const paragraphs = input.trim() ? input.trim().split(/\n\s*\n/).filter((p) => p.trim()).length : 0;
-    const sentences = input.trim() ? input.trim().split(/[。！？.!?\n]+/).filter((s) => s.trim()).length : 0;
+    const paragraphs = input.trim()
+      ? input
+          .trim()
+          .split(/\n\s*\n/)
+          .filter((p) => p.trim()).length
+      : 0;
+    const sentences = input.trim()
+      ? input
+          .trim()
+          .split(/[。！？.!?\n]+/)
+          .filter((s) => s.trim()).length
+      : 0;
     const bytes = new Blob([input]).size;
     const readingTime = Math.ceil(words / 200); // 200字/分钟
     return { chars, charsNoSpace, words, lines, paragraphs, sentences, bytes, readingTime };
