@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Menu, Typography, Tag } from "antd";
 import { ToolOutlined } from "@ant-design/icons";
-import { AppShell, ThemeProvider } from "./_shared";
+import { AppShell, ThemeProvider, QuickOpen } from "./_shared";
 import { TOOL_GROUPS, getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 
@@ -57,6 +57,7 @@ export default function App() {
         </div>
         <div style={{ padding: 24 }}>{activeTool?.render() ?? <div>选择一个工具</div>}</div>
       </AppShell>
+      <QuickOpen onSelect={setActivePlugin} />
     </ThemeProvider>
   );
 }
