@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, Select, InputNumber, Row, Col, Statistic, Space, Tag, Alert, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "exchange",
+  label: "汇率换算",
+  description: "在线/离线参考汇率",
+  icon: "dollar",
+};
+
+
 const CURRENCIES: Record<string, { name: string; symbol: string; flag: string }> = {
   USD: { name: "美元", symbol: "$", flag: "🇺🇸" },
   EUR: { name: "欧元", symbol: "€", flag: "🇪🇺" },

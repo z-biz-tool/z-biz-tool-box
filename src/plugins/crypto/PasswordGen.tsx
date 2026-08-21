@@ -15,6 +15,14 @@ import {
   message,
 } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "pwdgen",
+  label: "密码生成",
+  description: "随机密码生成器(熵可控)",
+  icon: "key",
+};
+
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const NUMBERS = "0123456789";

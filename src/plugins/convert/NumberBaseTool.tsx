@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, Input, Row, Col, Tag, Space, Radio, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "numberbase",
+  label: "进制转换",
+  description: "二/八/十/十六进制互转",
+  icon: "number",
+};
+
+
 type Base = "bin" | "oct" | "dec" | "hex";
 
 const BASE_INFO: Record<Base, { radix: number; label: string; color: string }> = {

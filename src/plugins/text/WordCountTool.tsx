@@ -1,6 +1,15 @@
 import { useState, useMemo } from "react";
 import { Input, Card, Row, Col, Statistic } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "wordcount",
+  label: "字数统计",
+  description: "字符/单词/行/段/句统计",
+  icon: "chart",
+};
+
+
 export default function WordCountTool() {
   const [input, setInput] = useState("");
 

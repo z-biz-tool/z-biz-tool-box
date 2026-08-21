@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, Select, InputNumber, Row, Col, Statistic, Space, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "unit",
+  label: "单位换算",
+  description: "长度/重量/温度/面积/体积/速度/数据/时间",
+  icon: "scale",
+};
+
+
 type Category = "length" | "weight" | "temperature" | "area" | "volume" | "speed" | "data" | "time";
 
 // 基准单位转换 (值 → 基准单位)

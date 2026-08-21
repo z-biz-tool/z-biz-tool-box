@@ -1,6 +1,15 @@
 import { useState, useMemo } from "react";
 import { Card, Input, Row, Col, Space, Tag, message, ColorPicker } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "color",
+  label: "颜色转换",
+  description: "HEX/RGB/HSL 互转 + 互补色",
+  icon: "color",
+};
+
+
 type RGB = { r: number; g: number; b: number };
 type HSL = { h: number; s: number; l: number };
 

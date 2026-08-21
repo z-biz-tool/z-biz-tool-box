@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "diff",
+  label: "文本对比",
+  description: "文本行级 Diff",
+  icon: "diff",
+};
+
+
 export default function DiffTool() {
   const [left, setLeft] = useState("");
   const [right, setRight] = useState("");

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio, Statistic, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "dedup",
+  label: "文本去重",
+  description: "按行/按词/去空行",
+  icon: "filter",
+};
+
+
 type Mode = "line" | "word" | "trim";
 
 export default function DedupTool() {

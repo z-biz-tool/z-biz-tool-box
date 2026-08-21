@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "case",
+  label: "大小写转换",
+  description: "upper/lower/camel/pascal/snake/kebab",
+  icon: "font",
+};
+
+
 export default function CaseTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");

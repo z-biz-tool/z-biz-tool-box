@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, InputNumber, Button, Space, Input, Select, Row, Col, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "lorem",
+  label: "Lorem 生成",
+  description: "Lorem Ipsum 占位文本",
+  icon: "file",
+};
+
+
 const WORDS = [
   "lorem",
   "ipsum",

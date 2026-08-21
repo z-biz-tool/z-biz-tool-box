@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Card, Row, Col, Tag, Alert, Typography, Space } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "jwt",
+  label: "JWT 解码",
+  description: "JWT Token Header/Payload/Signature 解析",
+  icon: "api",
+};
+
+
 export default function JwtDecoder() {
   const [token, setToken] = useState("");
   const [parts, setParts] = useState<{

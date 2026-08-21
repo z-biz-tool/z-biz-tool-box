@@ -15,6 +15,15 @@ import {
 } from "antd";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "clipboard",
+  label: "剪贴板",
+  description: "剪贴板历史/置顶/搜索/自动监听",
+  icon: "snippets",
+};
+
+
 interface ClipItem {
   id: number;
   text: string;

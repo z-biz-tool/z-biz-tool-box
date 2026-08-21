@@ -2,6 +2,15 @@ import { useState } from "react";
 import { Input, Button, Space, Card, message, Tabs, Tag } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "json",
+  label: "JSON 工具",
+  description: "JSON 格式化/校验/Path/转换",
+  icon: "database",
+};
+
+
 export default function JsonTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");

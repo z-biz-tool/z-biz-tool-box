@@ -1,6 +1,15 @@
 import { useState, useMemo } from "react";
 import { Card, Input, Progress, Tag, Row, Col, Statistic, List } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "pwdstr",
+  label: "密码强度",
+  description: "密码强度评分与建议",
+  icon: "shield",
+};
+
+
 interface Analysis {
   length: number;
   hasLower: boolean;

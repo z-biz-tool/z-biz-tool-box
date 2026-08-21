@@ -2,6 +2,15 @@ import { useState } from "react";
 import { Input, Button, Space, Card, message } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "base64",
+  label: "Base64",
+  description: "Base64 编码与解码",
+  icon: "code",
+};
+
+
 export default function Base64Tool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");

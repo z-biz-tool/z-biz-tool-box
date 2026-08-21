@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Select, Tag, Row, Col, Statistic } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "hash",
+  label: "哈希计算",
+  description: "MD5/SHA 哈希摘要",
+  icon: "key",
+};
+
+
 const ALGORITHMS = [
   { value: "md5", label: "MD5 (128位)" },
   { value: "sha-1", label: "SHA-1 (160位)" },

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "url",
+  label: "URL 编解码",
+  description: "URL/URI 编码与解码",
+  icon: "link",
+};
+
+
 export default function UrlTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");

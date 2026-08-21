@@ -13,6 +13,14 @@ import {
   Divider,
 } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "http",
+  label: "HTTP 测试",
+  description: "GET/POST/PUT/DELETE/PATCH 调试",
+  icon: "thunder",
+};
+
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 
 interface Header {

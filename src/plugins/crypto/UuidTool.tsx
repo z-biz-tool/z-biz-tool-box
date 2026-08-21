@@ -13,6 +13,15 @@ import {
 } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "uuid",
+  label: "UUID 生成",
+  description: "UUID v4 批量生成/历史",
+  icon: "id",
+};
+
+
 export default function UuidTool() {
   const [uuid, setUuid] = useState("");
   const [count, setCount] = useState(1);

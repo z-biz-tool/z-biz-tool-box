@@ -16,6 +16,15 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { EmptyState } from "../../_shared";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "market",
+  label: "插件市场",
+  description: "插件浏览/启用/扩展",
+  icon: "appstore",
+};
+
+
 interface PluginInfo {
   id: string;
   name: string;

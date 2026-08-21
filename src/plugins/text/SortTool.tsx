@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "sort",
+  label: "文本排序",
+  description: "升序/降序/自然排序/打乱",
+  icon: "sort",
+};
+
+
 type Mode = "asc" | "desc" | "shuffle" | "reverse" | "natural";
 
 export default function SortTool() {

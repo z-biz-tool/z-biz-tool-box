@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "reverse",
+  label: "文本翻转",
+  description: "字符/单词/行翻转",
+  icon: "retweet",
+};
+
+
 type Mode = "chars" | "words" | "lines" | "charsAll";
 
 export default function ReverseTool() {

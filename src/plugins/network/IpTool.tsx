@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, Input, Button, Space, Row, Col, Statistic, Tag, Alert, message } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "ip",
+  label: "IP 工具",
+  description: "IP/子网掩码/CIDR 计算",
+  icon: "globe",
+};
+
+
 function ipToInt(ip: string): number | null {
   const parts = ip.split(".").map((p) => parseInt(p, 10));
   if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return null;

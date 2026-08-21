@@ -19,6 +19,15 @@ import utc from "dayjs/plugin/utc";
 import dayOfYear from "dayjs/plugin/dayOfYear";
 import isLeapYear from "dayjs/plugin/isLeapYear";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "timestamp",
+  label: "时间戳",
+  description: "Unix 时间戳/日期 多时区互转",
+  icon: "clock",
+};
+
+
 dayjs.extend(utc);
 dayjs.extend(dayOfYear);
 dayjs.extend(isLeapYear);

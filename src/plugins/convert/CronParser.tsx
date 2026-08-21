@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, Input, Button, Space, Tag, Alert, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "cron",
+  label: "Cron 解析",
+  description: "Cron 表达式中文描述",
+  icon: "clock",
+};
+
+
 interface CronField {
   name: string;
   value: string;

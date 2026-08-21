@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col, Radio } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "hex",
+  label: "Hex 编解码",
+  description: "十六进制编码与解码",
+  icon: "hex",
+};
+
+
 type Mode = "string" | "bytes";
 
 export default function HexTool() {

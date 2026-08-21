@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col } from "antd";
 
+import type { PluginMeta } from "../_types";
+export const meta: PluginMeta = {
+  key: "html-entity",
+  label: "HTML 实体",
+  description: "HTML 实体编码与解码",
+  icon: "html",
+};
+
+
 const NAMED_ENTITIES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
