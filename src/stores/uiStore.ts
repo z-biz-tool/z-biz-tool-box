@@ -17,6 +17,12 @@ interface UiState {
    */
   inputs: Record<string, string>;
 
+  /**
+   * 禁用的工具 key 列表(用户主动隐藏)。空数组 = 全部启用。
+   * 禁用后从侧边栏/QuickOpen 过滤,但 PluginMarket 里仍可见/可重新启用。
+   */
+  disabled: string[];
+
   toggleTheme: () => void;
   setTheme: (t: ThemeMode) => void;
 
@@ -27,6 +33,10 @@ interface UiState {
 
   setInput: (key: string, value: string) => void;
   clearInput: (key: string) => void;
+
+  toggleDisabled: (key: string) => void;
+  isDisabled: (key: string) => boolean;
+  setDisabled: (disabled: string[]) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -36,6 +46,7 @@ export const useUiStore = create<UiState>()(
       starred: [],
       recent: [],
       inputs: {},
+      disabled: [],
 
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setTheme: (t) => set({ theme: t }),
@@ -60,6 +71,15 @@ export const useUiStore = create<UiState>()(
           const { [key]: _, ...rest } = s.inputs;
           return { inputs: rest };
         }),
+
+      toggleDisabled: (key) =>
+        set((s) => ({
+          disabled: s.disabled.includes(key)
+            ? s.disabled.filter((k) => k !== key)
+            : [...s.disabled, key],
+        })),
+      isDisabled: (key) => get().disabled.includes(key),
+      setDisabled: (disabled) => set({ disabled }),
     }),
     {
       name: "z-biz-tool-box-ui",
@@ -69,6 +89,7 @@ export const useUiStore = create<UiState>()(
         starred: s.starred,
         recent: s.recent,
         inputs: s.inputs,
+        disabled: s.disabled,
       }),
     }
   )

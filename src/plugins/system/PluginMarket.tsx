@@ -11,9 +11,14 @@ import {
   Space,
   Statistic,
   Badge,
+  Switch,
+  Tooltip,
+  Empty,
+  Divider,
 } from "antd";
-import { EmptyState, useCopyToClipboard } from "../../_shared";
-import { TOOL_GROUPS } from "../_registry";
+import { ReloadOutlined, AppstoreOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { useUiStore } from "../../stores/uiStore";
+import { ALL_TOOLS, TOOL_GROUPS } from "../_registry";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -23,7 +28,7 @@ export const meta: PluginMeta = {
   icon: "appstore",
 };
 
-const CATEGORIES = ["全部", "编码", "文本", "加密", "转换", "网络", "系统"];
+const CATEGORIES = ["全部", "启用", "禁用", "编码", "文本", "加密", "转换", "网络", "系统"];
 
 const CATEGORY_COLORS: Record<string, string> = {
   编码: "blue",
@@ -35,41 +40,78 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function PluginMarket() {
-  const [category, setCategory] = useState("全部");
+  const [filter, setFilter] = useState("全部");
   const [search, setSearch] = useState("");
-  const copy = useCopyToClipboard();
+  const disabled = useUiStore((s) => s.disabled);
+  const toggleDisabled = useUiStore((s) => s.toggleDisabled);
+  const setDisabled = useUiStore((s) => s.setDisabled);
 
-  // 直接从 _registry 派生所有工具(已包含 group/label/description/icon)
+  // 派生所有工具, 加上启用状态
   const allTools = useMemo(() => {
     return TOOL_GROUPS.flatMap((g) =>
       g.tools.map((t) => ({
-        id: t.key,
+        key: t.key,
         name: t.label,
         description: t.description,
         category: g.label,
         icon: t.key,
-        enabled: true,
+        enabled: !disabled.includes(t.key),
       }))
     );
-  }, []);
+  }, [disabled]);
 
   const filtered = useMemo(() => {
     return allTools.filter((tool) => {
-      const matchCat = category === "全部" || tool.category === category;
-      const matchSearch =
-        !search ||
-        tool.name.toLowerCase().includes(search.toLowerCase()) ||
-        tool.description.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      // 状态过滤
+      if (filter === "启用" && !tool.enabled) return false;
+      if (filter === "禁用" && tool.enabled) return false;
+      if (
+        filter !== "全部" &&
+        filter !== "启用" &&
+        filter !== "禁用" &&
+        tool.category !== filter
+      )
+        return false;
+      // 搜索
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !tool.name.toLowerCase().includes(q) &&
+          !tool.description.toLowerCase().includes(q)
+        )
+          return false;
+      }
+      return true;
     });
-  }, [allTools, category, search]);
+  }, [allTools, filter, search]);
+
+  const enabledCount = allTools.filter((t) => t.enabled).length;
+  const disabledCount = allTools.length - enabledCount;
 
   return (
     <Card title="插件市场" bordered={false}>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card size="small">
-            <Statistic title="总工具数" value={allTools.length} />
+            <Statistic title="总工具数" value={allTools.length} prefix={<AppstoreOutlined />} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small">
+            <Statistic
+              title="已启用"
+              value={enabledCount}
+              valueStyle={{ color: "#52c41a" }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small">
+            <Statistic
+              title="已禁用"
+              value={disabledCount}
+              valueStyle={{ color: disabledCount > 0 ? "#ff4d4f" : undefined }}
+            />
           </Card>
         </Col>
         <Col span={6}>
@@ -77,22 +119,12 @@ export default function PluginMarket() {
             <Statistic title="当前显示" value={filtered.length} />
           </Card>
         </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="分类数" value={CATEGORIES.length - 1} />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="来源" value="内置" />
-          </Card>
-        </Col>
       </Row>
 
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
-          value={category}
-          onChange={setCategory}
+          value={filter}
+          onChange={setFilter}
           style={{ width: 150 }}
           options={CATEGORIES.map((c) => ({ value: c, label: c }))}
         />
@@ -103,7 +135,15 @@ export default function PluginMarket() {
           style={{ width: 250 }}
           allowClear
         />
-        {CATEGORIES.filter((c) => c !== "全部").map((cat) => (
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={() => setDisabled([])}
+          disabled={disabledCount === 0}
+          title="全部启用"
+        >
+          全部启用
+        </Button>
+        {CATEGORIES.filter((c) => c !== "全部" && c !== "启用" && c !== "禁用").map((cat) => (
           <Badge
             key={cat}
             count={allTools.filter((t) => t.category === cat).length}
@@ -112,7 +152,7 @@ export default function PluginMarket() {
             <Tag
               color={CATEGORY_COLORS[cat] || "default"}
               style={{ cursor: "pointer", padding: "4px 12px" }}
-              onClick={() => setCategory(cat)}
+              onClick={() => setFilter(cat)}
             >
               {cat}
             </Tag>
@@ -120,43 +160,48 @@ export default function PluginMarket() {
         ))}
       </Space>
 
+      <Divider style={{ margin: "12px 0" }} />
+
       {filtered.length === 0 ? (
-        <EmptyState
-          title="未找到匹配的工具"
-          description="尝试更换关键词或分类筛选"
-        />
+        <Empty description="没有匹配的工具" />
       ) : (
         <Row gutter={[16, 16]}>
           {filtered.map((tool) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={tool.id}>
+            <Col xs={24} sm={12} md={8} lg={6} key={tool.key}>
               <Card
                 size="small"
                 hoverable
+                style={{
+                  opacity: tool.enabled ? 1 : 0.55,
+                  transition: "opacity 0.2s",
+                }}
                 title={
                   <Space>
-                    <Tag color={CATEGORY_COLORS[tool.category || ""] || "default"}>
-                      {tool.category}
-                    </Tag>
+                    <Tag color={CATEGORY_COLORS[tool.category] || "default"}>{tool.category}</Tag>
                     <Typography.Text strong>{tool.name}</Typography.Text>
                   </Space>
                 }
-                actions={[
-                  <Button key="copy" size="small" type="link" onClick={() => copy(tool.id)}>
-                    复制ID
-                  </Button>,
-                ]}
+                extra={
+                  <Tooltip title={tool.enabled ? "点击禁用" : "点击启用"}>
+                    <Switch
+                      size="small"
+                      checked={tool.enabled}
+                      onChange={() => toggleDisabled(tool.key)}
+                    />
+                  </Tooltip>
+                }
               >
                 <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                   {tool.description}
                 </Typography.Text>
                 <div style={{ marginTop: 8 }}>
                   <Tag color="blue" style={{ fontFamily: "monospace" }}>
-                    {tool.id}
+                    {tool.key}
                   </Tag>
-                  {tool.enabled !== undefined && (
-                    <Tag color={tool.enabled ? "green" : "default"}>
-                      {tool.enabled ? "已启用" : "未启用"}
-                    </Tag>
+                  {tool.enabled ? (
+                    <Tag color="green">已启用</Tag>
+                  ) : (
+                    <Tag color="default">未启用</Tag>
                   )}
                 </div>
               </Card>
@@ -164,6 +209,21 @@ export default function PluginMarket() {
           ))}
         </Row>
       )}
+
+      <Divider style={{ margin: "16px 0 8px" }} />
+
+      <Space size="small" style={{ width: "100%", justifyContent: "space-between" }}>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <FolderOpenOutlined /> 扩展目录:
+          <code style={{ marginLeft: 4, padding: "0 4px", background: "var(--ant-color-fill-tertiary)", borderRadius: 3 }}>
+            ~/.config/z-biz-tool-box/extensions/*.json
+          </code>
+          (v2)
+        </Typography.Text>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          共 {ALL_TOOLS.length} 个内置工具
+        </Typography.Text>
+      </Space>
     </Card>
   );
 }

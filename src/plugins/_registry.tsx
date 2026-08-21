@@ -138,7 +138,7 @@ collected.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.label.localeCo
 
 export const ALL_TOOLS: ToolMeta[] = collected;
 
-// ============ 派生 TOOL_GROUPS ============
+// ============ 派生 TOOL_GROUPS(全量, 包括禁用的)============
 
 export const TOOL_GROUPS: ToolGroup[] = Object.entries(GROUP_DEFS)
   .sort(([, a], [, b]) => a.order - b.order)
@@ -149,6 +149,14 @@ export const TOOL_GROUPS: ToolGroup[] = Object.entries(GROUP_DEFS)
     tools: ALL_TOOLS.filter((t) => t.group === key),
   }))
   .filter((g) => g.tools.length > 0);
+
+/**
+ * 过滤掉 disabled 的工具,用于侧边栏和 QuickOpen。
+ * 注意: 必须在调用方 (React 组件) 里 useUiStore 订阅, 这样能响应 disabled 变化。
+ */
+export function getEnabledTools(tools: ToolMeta[], disabled: string[]): ToolMeta[] {
+  return tools.filter((t) => !disabled.includes(t.key));
+}
 
 // ============ 查询辅助函数 ============
 

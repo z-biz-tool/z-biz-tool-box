@@ -29,6 +29,7 @@ export function QuickOpen({ onSelect }: QuickOpenProps) {
 
   const starred = useUiStore((s) => s.starred);
   const recent = useUiStore((s) => s.recent);
+  const disabled = useUiStore((s) => s.disabled);
   const toggleStar = useUiStore((s) => s.toggleStar);
 
   // ⌘K / Ctrl+K 全局快捷键
@@ -60,9 +61,10 @@ export function QuickOpen({ onSelect }: QuickOpenProps) {
     }
   }, [open]);
 
-  // 构建分组
+  // 构建分组(过滤掉禁用的)
   const sections: Section[] = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const isEnabled = (t: ToolMeta) => !disabled.includes(t.key);
     const matches = (t: ToolMeta) => {
       if (!q) return true;
       const hay = `${t.label} ${t.description} ${t.keywords ?? ""} ${t.key}`.toLowerCase();
@@ -71,23 +73,27 @@ export function QuickOpen({ onSelect }: QuickOpenProps) {
 
     if (q) {
       // 有查询: 全部工具扁平展示, 按匹配度排序
-      const matched = ALL_TOOLS.filter(matches);
+      const matched = ALL_TOOLS.filter((t) => isEnabled(t) && matches(t));
       return [{ title: `匹配 (${matched.length})`, tools: matched, icon: <SearchOutlined /> }];
     }
 
     // 无查询: 收藏 / 最近 / 全量
     const sec: Section[] = [];
+    const findEnabled = (k: string): ToolMeta | undefined => {
+      const t = ALL_TOOLS.find((x) => x.key === k);
+      return t && !disabled.includes(t.key) ? t : undefined;
+    };
     if (starred.length > 0) {
-      const ts = starred.map((k) => ALL_TOOLS.find((t) => t.key === k)).filter(Boolean) as ToolMeta[];
-      sec.push({ title: "★ 收藏", tools: ts, icon: <StarFilled style={{ color: "#faad14" }} /> });
+      const ts = starred.map(findEnabled).filter((t): t is ToolMeta => Boolean(t));
+      if (ts.length > 0) sec.push({ title: "★ 收藏", tools: ts, icon: <StarFilled style={{ color: "#faad14" }} /> });
     }
     if (recent.length > 0) {
-      const ts = recent.map((k) => ALL_TOOLS.find((t) => t.key === k)).filter(Boolean) as ToolMeta[];
-      sec.push({ title: "⏱ 最近", tools: ts, icon: <HistoryOutlined /> });
+      const ts = recent.map(findEnabled).filter((t): t is ToolMeta => Boolean(t));
+      if (ts.length > 0) sec.push({ title: "⏱ 最近", tools: ts, icon: <HistoryOutlined /> });
     }
-    sec.push({ title: "所有工具", tools: ALL_TOOLS, icon: <SearchOutlined /> });
+    sec.push({ title: "所有工具", tools: ALL_TOOLS.filter(isEnabled), icon: <SearchOutlined /> });
     return sec;
-  }, [query, starred, recent]);
+  }, [query, starred, recent, disabled]);
 
   // 扁平化用于键盘导航
   const flatTools = useMemo(() => sections.flatMap((s) => s.tools), [sections]);

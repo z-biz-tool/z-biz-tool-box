@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Menu, Typography, Tag } from "antd";
 import { ToolOutlined } from "@ant-design/icons";
 import { AppShell, ThemeProvider, QuickOpen } from "./_shared";
@@ -10,13 +10,24 @@ export default function App() {
   const activeTool = getTool(activePlugin);
   const activeGroup = getGroupOfTool(activePlugin);
   const pushRecent = useUiStore((s) => s.pushRecent);
+  const disabled = useUiStore((s) => s.disabled);
 
   // 进入插件即记入 recent(供 ⌘K 面板使用 — 见 B1)
   useEffect(() => {
     if (activePlugin) pushRecent(activePlugin);
   }, [activePlugin, pushRecent]);
 
-  const menuItems = TOOL_GROUPS.map((g) => ({
+  // 过滤掉禁用的工具
+  const visibleGroups = useMemo(
+    () =>
+      TOOL_GROUPS.map((g) => ({
+        ...g,
+        tools: g.tools.filter((t) => !disabled.includes(t.key)),
+      })).filter((g) => g.tools.length > 0),
+    [disabled]
+  );
+
+  const menuItems = visibleGroups.map((g) => ({
     key: g.key,
     icon: g.icon,
     label: g.label,
