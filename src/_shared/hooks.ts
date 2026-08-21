@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { message } from "antd";
+import { useUiStore } from "../stores/uiStore";
 
 /**
  * 复制文本到剪贴板的 hook — 统一处理 message 提示 + 容错。
@@ -44,4 +45,29 @@ export function useClearAll(setters: Array<() => void>) {
   return useCallback(() => {
     setters.forEach((s) => s());
   }, [setters]);
+}
+
+/**
+ * 工具输入持久化 hook — setInput 自动写入 uiStore,下次进入工具时自动恢复。
+ *
+ * @example
+ *   const [input, setInput] = usePluginInput("base64");
+ *   <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} />
+ */
+export function usePluginInput(pluginKey: string): [string, (v: string) => void] {
+  const persisted = useUiStore((s) => s.inputs[pluginKey] ?? "");
+  const storeSet = useUiStore((s) => s.setInput);
+  const storeClear = useUiStore((s) => s.clearInput);
+  const [local, setLocal] = useState(persisted);
+
+  const setter = useCallback(
+    (v: string) => {
+      setLocal(v);
+      if (v) storeSet(pluginKey, v);
+      else storeClear(pluginKey);
+    },
+    [pluginKey, storeSet, storeClear]
+  );
+
+  return [local, setter];
 }

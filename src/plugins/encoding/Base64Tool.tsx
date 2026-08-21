@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message } from "antd";
-import { useCopyToClipboard, useClearAll } from "../../_shared";
+import { useCopyToClipboard, useClearAll, usePluginInput } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -11,7 +11,7 @@ export const meta: PluginMeta = {
 };
 
 export default function Base64Tool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = usePluginInput("base64");
   const [output, setOutput] = useState("");
   const copy = useCopyToClipboard();
   const clear = useClearAll([() => setInput(""), () => setOutput("")]);

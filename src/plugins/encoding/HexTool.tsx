@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col, Radio } from "antd";
+import { usePluginInput } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -13,7 +14,7 @@ export const meta: PluginMeta = {
 type Mode = "string" | "bytes";
 
 export default function HexTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = usePluginInput("hex");
   const [output, setOutput] = useState("");
   const [mode, setMode] = useState<Mode>("string");
 

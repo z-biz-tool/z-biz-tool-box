@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col } from "antd";
+import { usePluginInput } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -11,7 +12,7 @@ export const meta: PluginMeta = {
 
 
 export default function UrlTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = usePluginInput("url");
   const [output, setOutput] = useState("");
 
   const encode = () => {
