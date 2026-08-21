@@ -11,7 +11,6 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -53,27 +52,7 @@ export default function UuidTool() {
       : "00000000-0000-0000-0000-000000000000";
   };
 
-  const generate = async () => {
-    try {
-      // 先尝试调用 Rust 后端
-      if (count === 1 && version === "v4") {
-        const result = await invoke<string>("execute_plugin", {
-          pluginId: "uuid",
-          action: "generate",
-          input: "",
-        });
-        let formatted = result;
-        if (!hyphens) formatted = formatted.replace(/-/g, "");
-        if (uppercase) formatted = formatted.toUpperCase();
-        setUuid(formatted);
-        setHistory([formatted, ...history].slice(0, 50));
-        message.success("UUID 生成成功");
-        return;
-      }
-    } catch {
-      // 回退前端
-    }
-
+  const generate = () => {
     const results: string[] = [];
     for (let i = 0; i < count; i++) {
       results.push(version === "v4" ? generateV4() : generateNil());

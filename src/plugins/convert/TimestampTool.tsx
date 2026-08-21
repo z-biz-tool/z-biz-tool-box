@@ -13,7 +13,6 @@ import {
   Radio,
   Tag,
 } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import dayOfYear from "dayjs/plugin/dayOfYear";
@@ -66,17 +65,8 @@ export default function TimestampTool() {
     return () => clearInterval(timer);
   }, []);
 
-  const getNow = async () => {
-    try {
-      const result = await invoke<string>("execute_plugin", {
-        pluginId: "timestamp",
-        action: "now",
-        input: "",
-      });
-      setCurrentNow(result);
-    } catch {
-      setCurrentNow(String(Math.floor(Date.now() / 1000)));
-    }
+  const getNow = () => {
+    setCurrentNow(String(Math.floor(Date.now() / 1000)));
   };
 
   const convertTs = () => {

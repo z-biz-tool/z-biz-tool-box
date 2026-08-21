@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Tabs, Tag } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -26,40 +25,17 @@ export default function JsonTool() {
     }
   };
 
-  const format = async () => {
-    try {
-      const result = await invoke<string>("execute_plugin", {
-        pluginId: "json-format",
-        action: "format",
-        input,
-      });
-      setOutput(result);
-      setError("");
-    } catch {
-      // 回退前端实现
-      safe(() => {
-        const obj = JSON.parse(input);
-        setOutput(JSON.stringify(obj, null, 2));
-      });
-    }
-  };
+  const format = () =>
+    safe(() => {
+      const obj = JSON.parse(input);
+      setOutput(JSON.stringify(obj, null, 2));
+    });
 
-  const minify = async () => {
-    try {
-      const result = await invoke<string>("execute_plugin", {
-        pluginId: "json-format",
-        action: "minify",
-        input,
-      });
-      setOutput(result);
-      setError("");
-    } catch {
-      safe(() => {
-        const obj = JSON.parse(input);
-        setOutput(JSON.stringify(obj));
-      });
-    }
-  };
+  const minify = () =>
+    safe(() => {
+      const obj = JSON.parse(input);
+      setOutput(JSON.stringify(obj));
+    });
 
   const validate = () =>
     safe(() => {

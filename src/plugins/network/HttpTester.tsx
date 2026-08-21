@@ -12,6 +12,7 @@ import {
   message,
   Divider,
 } from "antd";
+import { invoke } from "@tauri-apps/api/core";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -54,43 +55,44 @@ export default function HttpTester() {
     }
     setLoading(true);
     setResponse(null);
-    const startTime = performance.now();
     try {
+      // 走 Rust 后端 — 支持 30s timeout + 强制忽略证书验证
       const headerObj: Record<string, string> = {};
       headers.forEach((h) => {
         if (h.key) headerObj[h.key] = h.value;
       });
 
-      const options: RequestInit = { method, headers: headerObj };
-      if (method !== "GET" && method !== "HEAD" && body) {
-        options.body = body;
-      }
-
-      const resp = await fetch(url, options);
-      const endTime = performance.now();
-      const respBody = await resp.text();
-      const respHeaders: Record<string, string> = {};
-      resp.headers.forEach((value, key) => {
-        respHeaders[key] = value;
+      const resp = await invoke<{
+        status: number;
+        statusText: string;
+        headers: Record<string, string>;
+        body: string;
+        elapsed_ms: number;
+        success: boolean;
+        error?: string;
+      }>("http_request", {
+        url,
+        method,
+        body: method !== "GET" && method !== "HEAD" ? body || null : null,
+        headers: Object.keys(headerObj).length > 0 ? headerObj : null,
       });
 
       setResponse({
         status: resp.status,
         statusText: resp.statusText,
-        headers: respHeaders,
-        body: respBody,
-        time: Math.round(endTime - startTime),
-        size: new Blob([respBody]).size,
+        headers: resp.headers,
+        body: resp.body,
+        time: resp.elapsed_ms,
+        size: new Blob([resp.body]).size,
       });
       message.success(`请求完成: ${resp.status}`);
     } catch (e) {
-      const endTime = performance.now();
       setResponse({
         status: 0,
         statusText: "Error",
         headers: {},
         body: String(e),
-        time: Math.round(endTime - startTime),
+        time: 0,
         size: 0,
       });
       message.error("请求失败: " + String(e));

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 import { useCopyToClipboard, useClearAll } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
@@ -17,29 +16,19 @@ export default function Base64Tool() {
   const copy = useCopyToClipboard();
   const clear = useClearAll([() => setInput(""), () => setOutput("")]);
 
-  const encode = async () => {
+  const encode = () => {
     try {
-      const result = await invoke<string>("execute_plugin", { pluginId: "base64", action: "encode", input });
-      setOutput(result);
+      setOutput(btoa(unescape(encodeURIComponent(input))));
     } catch {
-      try {
-        setOutput(btoa(unescape(encodeURIComponent(input))));
-      } catch {
-        message.error("编码失败");
-      }
+      message.error("编码失败");
     }
   };
 
-  const decode = async () => {
+  const decode = () => {
     try {
-      const result = await invoke<string>("execute_plugin", { pluginId: "base64", action: "decode", input });
-      setOutput(result);
+      setOutput(decodeURIComponent(escape(atob(input))));
     } catch {
-      try {
-        setOutput(decodeURIComponent(escape(atob(input))));
-      } catch {
-        message.error("解码失败:无效的 Base64");
-      }
+      message.error("解码失败:无效的 Base64");
     }
   };
 
