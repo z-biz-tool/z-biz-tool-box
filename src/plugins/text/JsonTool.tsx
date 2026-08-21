@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Tabs, Tag } from "antd";
+import { useCommonStyles } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -11,6 +12,7 @@ export const meta: PluginMeta = {
 
 
 export default function JsonTool() {
+  const s = useCommonStyles();
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
@@ -195,7 +197,7 @@ export default function JsonTool() {
         rows={8}
         value={output}
         readOnly
-        style={{ fontFamily: "monospace", background: "#fafafa" }}
+        style={s.output}
       />
     </Card>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message } from "antd";
-import { useCopyToClipboard, useClearAll, usePluginInput } from "../../_shared";
+import { useCopyToClipboard, useClearAll, usePluginInput, useCommonStyles } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -11,6 +11,7 @@ export const meta: PluginMeta = {
 };
 
 export default function Base64Tool() {
+  const s = useCommonStyles();
   const [input, setInput] = usePluginInput("base64");
   const [output, setOutput] = useState("");
   const copy = useCopyToClipboard();
@@ -40,13 +41,13 @@ export default function Base64Tool() {
         onChange={(e) => setInput(e.target.value)}
         placeholder="输入要编码/解码的文本"
       />
-      <Space style={{ margin: "12px 0" }}>
+      <Space style={s.btnRow}>
         <Button type="primary" onClick={encode}>编码</Button>
         <Button onClick={decode}>解码</Button>
         <Button onClick={clear}>清空</Button>
         <Button onClick={() => copy(output)} disabled={!output}>复制结果</Button>
       </Space>
-      <Input.TextArea rows={5} value={output} readOnly style={{ fontFamily: "monospace" }} />
+      <Input.TextArea rows={5} value={output} readOnly style={s.output} />
     </Card>
   );
 }
