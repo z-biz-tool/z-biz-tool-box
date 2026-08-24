@@ -29,6 +29,15 @@ const TOOL_ID_PREFIX: &str = "tool:";
 fn build_menu<R: Runtime>(app: &AppHandle<R>, groups: &[GroupEntry]) -> tauri::Result<Menu<R>> {
     let menu = Menu::new(app)?;
 
+    // 顶部快捷项: 显示/隐藏主窗口
+    let show_item = MenuItem::with_id(app, "show-main", "🔍 唤起主窗口 (⌥Space)", true, None::<&str>)?;
+    menu.append(&show_item)?;
+    let hide_item = MenuItem::with_id(app, "hide-main", "👋 隐藏主窗口", true, None::<&str>)?;
+    menu.append(&hide_item)?;
+
+    let sep0 = PredefinedMenuItem::separator(app)?;
+    menu.append(&sep0)?;
+
     for g in groups {
         let sub = Submenu::new(app, &g.label, true)?;
         for t in &g.tools {
@@ -54,6 +63,22 @@ pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+    }
+}
+
+/// 切换主窗口显示/隐藏(toggle)
+pub fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(w) = app.get_webview_window("main") {
+        match w.is_visible() {
+            Ok(true) => {
+                let _ = w.hide();
+            }
+            _ => {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
     }
 }
 
@@ -83,6 +108,16 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> t
             let id = event.id.as_ref();
             if id == "quit" {
                 app.exit(0);
+                return;
+            }
+            if id == "show-main" {
+                show_main_window(app);
+                return;
+            }
+            if id == "hide-main" {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
                 return;
             }
             if let Some(tool_key) = id.strip_prefix(TOOL_ID_PREFIX) {

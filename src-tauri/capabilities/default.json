@@ -11,9 +11,13 @@
     "core:window:allow-unminimize",
     "core:event:default",
     "core:tray:default",
+    "core:webview:allow-internal-toggle-devtools",
     "clipboard-manager:default",
     "dialog:default",
     "fs:default",
-    "shell:default"
+    "shell:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered"
   ]
 }

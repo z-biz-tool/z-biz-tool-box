@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Menu, Typography, Tag } from "antd";
-import { ToolOutlined } from "@ant-design/icons";
+import { Menu, Typography, Tag, Button, Tooltip } from "antd";
+import { ToolOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AppShell, ThemeProvider, QuickOpen } from "./_shared";
 import { TOOL_GROUPS, getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
@@ -27,7 +28,6 @@ export default function App() {
   const pushRecent = useUiStore((s) => s.pushRecent);
   const disabled = useUiStore((s) => s.disabled);
   const extPlugins = useExtStore((s) => s.plugins);
-  const refreshExt = useExtStore((s) => s.refresh);
 
   // 启动时扫描外部插件目录
   useEffect(() => {
@@ -38,6 +38,23 @@ export default function App() {
   useEffect(() => {
     if (activePlugin) pushRecent(activePlugin);
   }, [activePlugin, pushRecent]);
+
+  // 监听 esc → 隐藏主窗口
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // 如果 QuickOpen 开着,不抢(QuickOpen 自己处理)
+        const qo = document.querySelector(".ant-modal-wrap:not([style*='display: none'])");
+        if (qo) return;
+        // 隐藏主窗口
+        getCurrentWindow()
+          .hide()
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // 过滤掉禁用的内置工具
   const visibleGroups = useMemo(
@@ -77,6 +94,18 @@ export default function App() {
     ? extPlugins.find((p) => p.id === active.pluginId)
     : undefined;
 
+  // 浮层窗口控制
+  const hideWindow = async () => {
+    try {
+      await getCurrentWindow().hide();
+    } catch {}
+  };
+  const minimizeWindow = async () => {
+    try {
+      await getCurrentWindow().minimize();
+    } catch {}
+  };
+
   return (
     <ThemeProvider>
       <AppShell
@@ -92,15 +121,39 @@ export default function App() {
             style={{ borderRight: 0, height: "100%" }}
           />
         }
+        headerExtra={
+          <div data-tauri-drag-region style={{ display: "flex", gap: 4 }}>
+            <Tooltip title="最小化">
+              <Button
+                size="small"
+                type="text"
+                icon={<MinusOutlined />}
+                onClick={minimizeWindow}
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              />
+            </Tooltip>
+            <Tooltip title="隐藏 (esc)">
+              <Button
+                size="small"
+                type="text"
+                icon={<CloseOutlined />}
+                onClick={hideWindow}
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              />
+            </Tooltip>
+          </div>
+        }
       >
         <div
+          data-tauri-drag-region
           style={{
             padding: "12px 24px",
             borderBottom: "1px solid var(--ant-color-border-secondary)",
             background: "var(--ant-color-bg-container)",
+            cursor: "default",
           }}
         >
-          <Typography.Title level={4} style={{ margin: 0 }}>
+          <Typography.Title level={4} style={{ margin: 0, WebkitAppRegion: "drag" } as React.CSSProperties}>
             {activeTool?.label ?? (extPlugin ? extPlugin.name : "工具箱")}
             {activeGroup && (
               <Tag color="blue" style={{ marginLeft: 12, fontSize: 12 }}>
@@ -122,7 +175,6 @@ export default function App() {
           ) : (
             <div style={{ padding: 24 }}>
               <p>外部插件 "{active.pluginId}" 未加载</p>
-              <button onClick={refreshExt}>刷新插件列表</button>
             </div>
           )}
         </div>
