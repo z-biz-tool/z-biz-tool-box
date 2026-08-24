@@ -23,6 +23,7 @@ export const meta: PluginMeta = {
   key: "timestamp",
   label: "时间戳",
   description: "Unix 时间戳/日期 多时区互转",
+  cmds: ["timestamp", "unix time", "时间戳", "Unix"],
   icon: "clock",
 };
 

@@ -17,6 +17,7 @@ export const meta: PluginMeta = {
   key: "uuid",
   label: "UUID 生成",
   description: "UUID v4 批量生成/历史",
+  cmds: ["uuid", "guid", "UUID生成"],
   icon: "id",
 };
 

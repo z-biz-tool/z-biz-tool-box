@@ -7,6 +7,7 @@ export const meta: PluginMeta = {
   key: "url",
   label: "URL 编解码",
   description: "URL/URI 编码与解码",
+  cmds: ["url", "url encode", "url decode", "URL编解码", "URI"],
   icon: "link",
 };
 

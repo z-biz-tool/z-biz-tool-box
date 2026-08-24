@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "reverse",
   label: "文本翻转",
   description: "字符/单词/行翻转",
+  cmds: ["reverse", "flip", "text reverse", "翻转"],
   icon: "retweet",
 };
 

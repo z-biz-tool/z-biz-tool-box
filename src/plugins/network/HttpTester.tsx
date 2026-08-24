@@ -19,6 +19,7 @@ export const meta: PluginMeta = {
   key: "http",
   label: "HTTP 测试",
   description: "GET/POST/PUT/DELETE/PATCH 调试",
+  cmds: ["http", "api test", "curl", "HTTP测试", "接口测试"],
   icon: "thunder",
 };
 

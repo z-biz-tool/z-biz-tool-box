@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "lorem",
   label: "Lorem 生成",
   description: "Lorem Ipsum 占位文本",
+  cmds: ["lorem", "ipsum", "lorem ipsum", "占位文本"],
   icon: "file",
 };
 

@@ -7,6 +7,7 @@ export const meta: PluginMeta = {
   key: "hex",
   label: "Hex 编解码",
   description: "十六进制编码与解码",
+  cmds: ["hex", "hex encode", "hex decode", "十六进制"],
   icon: "hex",
 };
 

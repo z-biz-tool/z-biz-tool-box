@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "ip",
   label: "IP 工具",
   description: "IP/子网掩码/CIDR 计算",
+  cmds: ["ip", "subnet", "ip subnet", "子网", "IP地址"],
   icon: "globe",
 };
 

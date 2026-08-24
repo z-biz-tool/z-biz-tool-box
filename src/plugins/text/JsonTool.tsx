@@ -7,6 +7,7 @@ export const meta: PluginMeta = {
   key: "json",
   label: "JSON 工具",
   description: "JSON 格式化/校验/Path/转换",
+  cmds: ["json", "json format", "json格式化", "jsonpath", "JSON工具", "JSONPath"],
   icon: "database",
 };
 

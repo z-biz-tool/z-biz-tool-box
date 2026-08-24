@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "dedup",
   label: "文本去重",
   description: "按行/按词/去空行",
+  cmds: ["dedup", "deduplicate", "unique", "去重"],
   icon: "filter",
 };
 

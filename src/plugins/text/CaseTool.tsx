@@ -7,6 +7,7 @@ export const meta: PluginMeta = {
   key: "case",
   label: "大小写转换",
   description: "upper/lower/camel/pascal/snake/kebab",
+  cmds: ["case", "lowercase", "uppercase", "camel", "pascal", "snake", "kebab", "大小写", "驼峰"],
   icon: "font",
 };
 

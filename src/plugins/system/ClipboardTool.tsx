@@ -20,6 +20,7 @@ export const meta: PluginMeta = {
   key: "clipboard",
   label: "剪贴板",
   description: "剪贴板历史/置顶/搜索/自动监听",
+  cmds: ["clipboard", "clipboard history", "剪贴板"],
   icon: "snippets",
 };
 

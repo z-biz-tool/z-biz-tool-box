@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "color",
   label: "颜色转换",
   description: "HEX/RGB/HSL 互转 + 互补色",
+  cmds: ["color", "color convert", "hex rgb hsl", "颜色", "颜色转换", "取色"],
   icon: "color",
 };
 

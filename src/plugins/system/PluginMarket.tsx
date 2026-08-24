@@ -34,6 +34,7 @@ export const meta: PluginMeta = {
   key: "market",
   label: "插件市场",
   description: "浏览/启用/扩展插件",
+  cmds: ["market", "plugin market", "插件市场"],
   icon: "appstore",
 };
 

@@ -7,6 +7,7 @@ export const meta: PluginMeta = {
   key: "base64",
   label: "Base64",
   description: "Base64 编码与解码",
+  cmds: ["base64", "b64", "Base64编解码"],
   icon: "code",
 };
 

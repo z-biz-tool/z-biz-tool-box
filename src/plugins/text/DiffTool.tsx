@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "diff",
   label: "文本对比",
   description: "文本行级 Diff",
+  cmds: ["diff", "text diff", "差异对比", "对比"],
   icon: "diff",
 };
 

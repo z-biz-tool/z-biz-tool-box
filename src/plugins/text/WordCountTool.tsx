@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "wordcount",
   label: "字数统计",
   description: "字符/单词/行/段/句统计",
+  cmds: ["wordcount", "word count", "字数", "统计", "字符数"],
   icon: "chart",
 };
 

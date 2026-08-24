@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "html-entity",
   label: "HTML 实体",
   description: "HTML 实体编码与解码",
+  cmds: ["html-entity", "html entity", "htmlencode", "HTML实体"],
   icon: "html",
 };
 

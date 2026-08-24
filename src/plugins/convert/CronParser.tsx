@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "cron",
   label: "Cron 解析",
   description: "Cron 表达式中文描述",
+  cmds: ["cron", "cron parse", "cron expression", "Cron", "Cron解析"],
   icon: "clock",
 };
 

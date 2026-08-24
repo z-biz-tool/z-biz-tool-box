@@ -12,8 +12,18 @@ export interface PluginMeta {
   label: string;
   /** 一句话描述(用于搜索/列表) */
   description: string;
-  /** 关键词,空格分隔,用于 ⌘K 模糊搜索(可选,默认从 label+description 派生) */
+  /**
+   * 关键词,空格分隔,用于 ⌘K 模糊搜索(可选)
+   * 注: cmds 是更结构化的"命令触发词", 详见 cmds
+   */
   keywords?: string;
+  /**
+   * 命令触发词数组 (类似 utools 的 "Pick Color" / "截图" 双标签)
+   * - 第一个通常是英文/拼音短码, 第二个通常是中文
+   * - 搜索时 label/description/keywords/cmds 都参与匹配
+   * - example: ['base64', 'b64', 'Base64 编解码']
+   */
+  cmds?: string[];
   /** 排序权重,数字越小越靠前(可选,默认按注册顺序) */
   order?: number;
   /**

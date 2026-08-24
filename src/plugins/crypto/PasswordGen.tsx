@@ -20,6 +20,7 @@ export const meta: PluginMeta = {
   key: "pwdgen",
   label: "密码生成",
   description: "随机密码生成器(熵可控)",
+  cmds: ["pwdgen", "password gen", "password", "密码生成", "随机密码"],
   icon: "key",
 };
 

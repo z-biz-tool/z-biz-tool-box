@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "unit",
   label: "单位换算",
   description: "长度/重量/温度/面积/体积/速度/数据/时间",
+  cmds: ["unit", "unit convert", "length", "weight", "temperature", "单位", "单位换算"],
   icon: "scale",
 };
 

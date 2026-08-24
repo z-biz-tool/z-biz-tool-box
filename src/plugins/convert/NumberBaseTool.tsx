@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "numberbase",
   label: "进制转换",
   description: "二/八/十/十六进制互转",
+  cmds: ["numberbase", "base convert", "binary", "hex", "进制", "进制转换"],
   icon: "number",
 };
 

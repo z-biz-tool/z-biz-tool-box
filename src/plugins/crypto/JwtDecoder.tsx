@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "jwt",
   label: "JWT 解码",
   description: "JWT Token Header/Payload/Signature 解析",
+  cmds: ["jwt", "jwt decode", "JSON Web Token", "JWT解码"],
   icon: "api",
 };
 

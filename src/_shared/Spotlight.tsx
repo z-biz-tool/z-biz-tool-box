@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Tag } from "antd";
+import { Input } from "antd";
 import {
   SearchOutlined,
-  CloseOutlined,
-  StarFilled,
   AppstoreOutlined,
-  EnterOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
+  SettingOutlined,
+  StarOutlined,
+  RocketOutlined,
+  KeyOutlined,
+  ToolOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
 import type { ToolMeta } from "../plugins/_types";
@@ -18,22 +19,28 @@ import { openPluginsDir } from "../plugins/external/scanner";
 interface SpotlightProps {
   onSelect: (key: string) => void;
   onClose: () => void;
+  onOpenMarket: () => void;
+}
+
+type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
+
+interface NavItem {
+  key: NavKey | string;
+  label: string;
+  icon: React.ReactNode;
+  group?: "personal" | "preference" | "nav";
 }
 
 /**
- * uTools 风格主面板:
- *  - 顶部大搜索框 (默认聚焦)
- *  - 主体: 已固定 / 分组 / 最近使用 / 外部插件 图标网格
- *  - 状态栏: 快捷键提示 + 关闭按钮
- *
- *  键盘:
- *   - ↑↓ 切换 active
- *   - ⏎ 选中
- *   - esc 关闭
- *   - 输入文字 → 实时过滤,只剩"匹配"组
+ * uTools 风格主面板 (三列布局):
+ *  - 左列 180px: 导航(所有功能 / 内置 / 外部 / 收藏 / 最近 / 设置)
+ *  - 中列 200px: 分类(编码/文本/.../外部)
+ *  - 右列 flex: 功能列表,每行: icon + label + 蓝色 cmds chips + 描述
  */
-export function Spotlight({ onSelect, onClose }: SpotlightProps) {
+export function Spotlight({ onSelect, onClose, onOpenMarket }: SpotlightProps) {
   const [query, setQuery] = useState("");
+  const [activeNav, setActiveNav] = useState<NavKey>("all");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [activeKey, setActiveKey] = useState<string>("");
   const inputRef = useRef<any>(null);
 
@@ -44,108 +51,124 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
 
-  // 自动聚焦输入框
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus?.(), 50);
     return () => clearTimeout(t);
   }, []);
 
-  // 过滤 + 派生所有可见 QuickItem
-  const visibleTool = useMemo(() => {
-    const all = ALL_TOOLS.filter((t) => !disabled.includes(t.key));
-    const lookup = (k: string) => all.find((t) => t.key === k);
+  // 工具全集
+  const allTools = useMemo(
+    () => ALL_TOOLS.filter((t) => !disabled.includes(t.key)),
+    [disabled]
+  );
 
-    const items: Array<{ tool: ToolMeta; section: string }> = [];
+  // 派生右侧功能列表
+  const items = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    const match = (t: ToolMeta) => {
-      if (!q) return true;
-      const hay = `${t.label} ${t.description} ${t.keywords ?? ""} ${t.key}`.toLowerCase();
-      return q.split(/\s+/).every((w) => hay.includes(w));
-    };
+    // 根据 activeNav 过滤
+    let pool: ToolMeta[] = [];
+    if (activeNav === "all") {
+      pool = allTools;
+    } else if (activeNav === "builtin") {
+      pool = allTools;
+    } else if (activeNav === "external") {
+      // 外部插件 features 摊平
+      for (const p of extPlugins) {
+        if (p.error) continue;
+        for (const f of p.features) {
+          pool.push({
+            key: `ext::${p.id}::${f.code}`,
+            label: f.explain,
+            description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
+            group: p.id,
+            groupLabel: `📦 ${p.name}`,
+            icon: p.logoUrl ? (
+              <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
+            ) : (
+              <AppstoreOutlined />
+            ),
+            cmds: f.cmds ?? [],
+            render: () => null,
+          });
+        }
+      }
+    } else if (activeNav === "starred") {
+      pool = starred.map((k) => allTools.find((t) => t.key === k)).filter(Boolean) as ToolMeta[];
+    } else if (activeNav === "recent") {
+      pool = recent.map((k) => allTools.find((t) => t.key === k)).filter(Boolean) as ToolMeta[];
+    }
 
-    // 1. 已固定 (过滤 query)
-    if (!q) {
-      for (const k of starred) {
-        const t = lookup(k);
-        if (t) items.push({ tool: t, section: "已固定" });
+    // 根据 activeCategory 过滤(仅当 activeNav=all/builtin)
+    if ((activeNav === "all" || activeNav === "builtin") && activeCategory !== "all") {
+      if (activeCategory === "external") {
+        // 切换到 external
+        pool = [];
+        for (const p of extPlugins) {
+          if (p.error) continue;
+          for (const f of p.features) {
+            pool.push({
+              key: `ext::${p.id}::${f.code}`,
+              label: f.explain,
+              description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
+              group: p.id,
+              groupLabel: `📦 ${p.name}`,
+              icon: p.logoUrl ? (
+                <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
+              ) : (
+                <AppstoreOutlined />
+              ),
+              cmds: f.cmds ?? [],
+              render: () => null,
+            });
+          }
+        }
+      } else {
+        pool = pool.filter((t) => {
+          if (t.key.startsWith("ext::")) return false; // 外部不过滤 by category
+          return t.group === activeCategory;
+        });
       }
     }
 
-    // 2. 按分组 (内建工具)
-    for (const g of TOOL_GROUPS) {
-      for (const t of g.tools) {
-        if (disabled.includes(t.key)) continue;
-        if (!match(t)) continue;
-        items.push({ tool: t, section: g.label });
-      }
+    // query 过滤
+    if (q) {
+      pool = pool.filter((t) => {
+        const hay = `${t.label} ${t.description} ${t.keywords ?? ""} ${(t.cmds ?? []).join(" ")} ${t.key}`.toLowerCase();
+        return q.split(/\s+/).every((w) => hay.includes(w));
+      });
     }
 
-    // 3. 外部插件 features
-    for (const p of extPlugins) {
-      if (p.error) continue;
-      for (const f of p.features) {
-        const tool: ToolMeta = {
-          key: `ext::${p.id}::${f.code}`,
-          label: f.explain,
-          description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
-          group: p.id,
-          groupLabel: `📦 ${p.name}`,
-          icon: p.logoUrl ? (
-            <img src={p.logoUrl} style={{ width: 18, height: 18, borderRadius: 3 }} />
-          ) : (
-            <AppstoreOutlined />
-          ),
-          render: () => null, // 由 onSelect 路径处理
-        };
-        if (!match(tool)) continue;
-        items.push({ tool, section: `📦 ${p.name}` });
-      }
-    }
+    return pool;
+  }, [activeNav, activeCategory, query, allTools, starred, recent, extPlugins, disabled]);
 
-    return items;
-  }, [query, starred, recent, disabled, extPlugins]);
-
-  // 按 section 分组
-  const groupedSections = useMemo(() => {
-    const map = new Map<string, Array<ToolMeta>>();
-    const order: string[] = [];
-    for (const it of visibleTool) {
-      if (!map.has(it.section)) {
-        map.set(it.section, []);
-        order.push(it.section);
-      }
-      map.get(it.section)!.push(it.tool);
-    }
-    return order.map((s) => ({ title: s, tools: map.get(s)! }));
-  }, [visibleTool]);
-
-  // 默认 active 选中第一个
+  // 默认 activeKey
   useEffect(() => {
-    if (visibleTool.length > 0 && (!activeKey || !visibleTool.find((v) => v.tool.key === activeKey))) {
-      setActiveKey(visibleTool[0].tool.key);
+    if (items.length > 0 && (!activeKey || !items.find((t) => t.key === activeKey))) {
+      setActiveKey(items[0].key);
     }
-  }, [visibleTool, activeKey]);
+    if (items.length === 0) {
+      setActiveKey("");
+    }
+  }, [items, activeKey]);
 
   // 键盘导航
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown" || (e.key === "j" && e.metaKey)) {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        const idx = visibleTool.findIndex((v) => v.tool.key === activeKey);
-        const next = visibleTool[Math.min(visibleTool.length - 1, idx + 1)];
-        if (next) setActiveKey(next.tool.key);
-      } else if (e.key === "ArrowUp" || (e.key === "k" && e.metaKey)) {
+        const idx = items.findIndex((t) => t.key === activeKey);
+        const next = items[Math.min(items.length - 1, idx + 1)];
+        if (next) setActiveKey(next.key);
+      } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        const idx = visibleTool.findIndex((v) => v.tool.key === activeKey);
-        const prev = visibleTool[Math.max(0, idx - 1)];
-        if (prev) setActiveKey(prev.tool.key);
+        const idx = items.findIndex((t) => t.key === activeKey);
+        const prev = items[Math.max(0, idx - 1)];
+        if (prev) setActiveKey(prev.key);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        const cur = visibleTool.find((v) => v.tool.key === activeKey);
-        if (cur) {
-          onSelect(cur.tool.key);
-        }
+        const cur = items.find((t) => t.key === activeKey);
+        if (cur) onSelect(cur.key);
       } else if (e.key === "Escape") {
         e.preventDefault();
         if (query) {
@@ -153,18 +176,13 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
         } else {
           onClose();
         }
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        // ⌘K 在 spotlight 内 = 切到 QuickOpen
-        e.preventDefault();
-        // 不做事, 让 QuickOpen 自带逻辑打开
-        // (这里需要 QuickOpen 接受外部 trigger; 简单方案: 不干预)
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [visibleTool, activeKey, onSelect, onClose, query]);
+  }, [items, activeKey, onSelect, onClose, query]);
 
-  // 滚到 active 项
+  // 滚到 active
   useEffect(() => {
     if (!activeKey) return;
     const el = document.querySelector(`[data-sp-idx="${activeKey}"]`);
@@ -184,91 +202,308 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
       {/* 顶部: 搜索框 */}
       <div
         style={{
-          padding: "14px 20px 10px",
+          padding: "12px 16px",
           borderBottom: "1px solid var(--ant-color-border-secondary)",
         }}
       >
         <Input
           ref={inputRef}
           size="large"
-          prefix={<SearchOutlined style={{ fontSize: 18, color: "var(--ant-color-text-tertiary)" }} />}
+          prefix={
+            <SearchOutlined
+              style={{ fontSize: 16, color: "var(--ant-color-text-tertiary)" }}
+            />
+          }
           placeholder="搜索功能 / 粘贴文件、图片"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           variant="borderless"
-          style={{ fontSize: 18, height: 40 }}
+          style={{ fontSize: 15, height: 36 }}
           allowClear
         />
       </div>
 
-      {/* 主体: 分组图标网格 */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "12px 20px 8px",
-        }}
-      >
-        {visibleTool.length === 0 ? (
+      {/* 主体: 三列 */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* 左列: 导航 */}
+        <div
+          style={{
+            width: 180,
+            borderRight: "1px solid var(--ant-color-border-secondary)",
+            padding: "12px 8px",
+            overflowY: "auto",
+            background: "var(--ant-color-bg-container)",
+          }}
+        >
+          <NavSection title="导航">
+            <NavItem
+              icon={<AppstoreOutlined />}
+              label="所有功能"
+              active={activeNav === "all"}
+              onClick={() => {
+                setActiveNav("all");
+                setActiveCategory("all");
+              }}
+            />
+            <NavItem
+              icon={<ToolOutlined />}
+              label="内置插件"
+              active={activeNav === "builtin"}
+              onClick={() => {
+                setActiveNav("builtin");
+                setActiveCategory("all");
+              }}
+            />
+            <NavItem
+              icon={<AppstoreOutlined />}
+              label="外部插件"
+              active={activeNav === "external"}
+              onClick={() => {
+                setActiveNav("external");
+                setActiveCategory("all");
+              }}
+              badge={extPlugins.length}
+            />
+          </NavSection>
+
+          <NavSection title="我的">
+            <NavItem
+              icon={<StarOutlined />}
+              label="我的收藏"
+              active={activeNav === "starred"}
+              onClick={() => {
+                setActiveNav("starred");
+                setActiveCategory("all");
+              }}
+              badge={starred.length}
+            />
+            <NavItem
+              icon={<RocketOutlined />}
+              label="最近使用"
+              active={activeNav === "recent"}
+              onClick={() => {
+                setActiveNav("recent");
+                setActiveCategory("all");
+              }}
+              badge={recent.length}
+            />
+          </NavSection>
+
+          <NavSection title="设置">
+            <NavItem
+              icon={<SettingOutlined />}
+              label="偏好设置"
+              onClick={() => {}}
+            />
+            <NavItem
+              icon={<KeyOutlined />}
+              label="快捷键"
+              onClick={() => {}}
+            />
+          </NavSection>
+        </div>
+
+        {/* 中列: 分类(仅 all/builtin 时显示) */}
+        {(activeNav === "all" || activeNav === "builtin") && (
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "var(--ant-color-text-tertiary)",
-              gap: 12,
+              width: 180,
+              borderRight: "1px solid var(--ant-color-border-secondary)",
+              padding: "12px 8px",
+              overflowY: "auto",
+              background: "var(--ant-color-bg-container)",
             }}
           >
-            <SearchOutlined style={{ fontSize: 32, opacity: 0.3 }} />
-            <span>没有匹配的功能</span>
-            <span style={{ fontSize: 12 }}>试试: base64 / uuid / json / http / 时间戳</span>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {groupedSections.map((sec) => (
-              <div key={sec.title}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 8,
-                    fontSize: 12,
-                    color: "var(--ant-color-text-tertiary)",
-                  }}
-                >
-                  {sec.title.startsWith("已固定") && <StarFilled style={{ fontSize: 11, color: "#faad14" }} />}
-                  <span style={{ fontWeight: 500 }}>{sec.title}</span>
-                  <span style={{ fontSize: 10, opacity: 0.6 }}>· {sec.tools.length}</span>
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(86px, 1fr))",
-                    gap: 6,
-                  }}
-                >
-                  {sec.tools.map((t) => (
-                    <ToolIcon
-                      key={t.key}
-                      tool={t}
-                      isActive={t.key === activeKey}
-                      onClick={() => onSelect(t.key)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+            <NavSection title="分类">
+              <NavItem
+                icon={<AppstoreOutlined style={{ opacity: 0.4 }} />}
+                label="全部分类"
+                active={activeCategory === "all"}
+                onClick={() => setActiveCategory("all")}
+              />
+              {TOOL_GROUPS.map((g) => {
+                const count = ALL_TOOLS.filter(
+                  (t) => t.group === g.key && !disabled.includes(t.key)
+                ).length;
+                return (
+                  <NavItem
+                    key={g.key}
+                    icon={g.icon}
+                    label={g.label}
+                    active={activeCategory === g.key}
+                    onClick={() => setActiveCategory(g.key)}
+                    badge={count}
+                  />
+                );
+              })}
+              <NavItem
+                icon={<AppstoreOutlined style={{ color: "#722ed1" }} />}
+                label="外部插件"
+                active={activeCategory === "external"}
+                onClick={() => setActiveCategory("external")}
+                badge={extPlugins.length}
+              />
+            </NavSection>
           </div>
         )}
+
+        {(activeNav === "external" || activeNav === "starred" || activeNav === "recent") && (
+          <div
+            style={{
+              width: 180,
+              borderRight: "1px solid var(--ant-color-border-secondary)",
+              padding: "12px 8px",
+              overflowY: "auto",
+              background: "var(--ant-color-bg-container)",
+            }}
+          >
+            {activeNav === "external" && (
+              <NavSection title="外部插件">
+                {extPlugins.length === 0 ? (
+                  <div style={{ padding: "8px 12px", color: "var(--ant-color-text-tertiary)", fontSize: 12 }}>
+                    还没有外部插件
+                    <br />
+                    点击右下「打开插件目录」
+                  </div>
+                ) : (
+                  extPlugins.map((p) => (
+                    <NavItem
+                      key={p.id}
+                      icon={
+                        p.logoUrl ? (
+                          <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
+                        ) : (
+                          <AppstoreOutlined style={{ color: "#722ed1" }} />
+                        )
+                      }
+                      label={p.name}
+                      active={activeCategory === p.id}
+                      onClick={() => setActiveCategory(p.id)}
+                      badge={p.features.length}
+                    />
+                  ))
+                )}
+              </NavSection>
+            )}
+            {activeNav === "starred" && (
+              <NavSection title="收藏的工具">
+                {starred.length === 0 ? (
+                  <div style={{ padding: "8px 12px", color: "var(--ant-color-text-tertiary)", fontSize: 12 }}>
+                    还没有收藏
+                  </div>
+                ) : (
+                  starred.map((k) => {
+                    const t = allTools.find((x) => x.key === k);
+                    if (!t) return null;
+                    return (
+                      <NavItem
+                        key={k}
+                        icon={t.icon}
+                        label={t.label}
+                        active={activeCategory === k}
+                        onClick={() => setActiveCategory(k)}
+                      />
+                    );
+                  })
+                )}
+              </NavSection>
+            )}
+            {activeNav === "recent" && (
+              <NavSection title="最近使用">
+                {recent.length === 0 ? (
+                  <div style={{ padding: "8px 12px", color: "var(--ant-color-text-tertiary)", fontSize: 12 }}>
+                    还没有记录
+                  </div>
+                ) : (
+                  recent.map((k) => {
+                    const t = allTools.find((x) => x.key === k);
+                    if (!t) return null;
+                    return (
+                      <NavItem
+                        key={k}
+                        icon={t.icon}
+                        label={t.label}
+                        active={activeCategory === k}
+                        onClick={() => setActiveCategory(k)}
+                      />
+                    );
+                  })
+                )}
+              </NavSection>
+            )}
+          </div>
+        )}
+
+        {/* 右列: 功能列表 */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            background: "var(--ant-color-bg-container)",
+          }}
+        >
+          {/* 顶部: tabs */}
+          <div
+            style={{
+              padding: "10px 16px 6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottom: "1px solid var(--ant-color-border-secondary)",
+              position: "sticky",
+              top: 0,
+              background: "var(--ant-color-bg-container)",
+              zIndex: 1,
+            }}
+          >
+            <div style={{ display: "flex", gap: 4 }}>
+              <TabButton active>功能 ({query ? items.length : allTools.length + extPlugins.reduce((s, p) => s + p.features.length, 0)})</TabButton>
+              {query && <TabButton>匹配 ({items.length})</TabButton>}
+            </div>
+            {extPlugins.length > 0 && (
+              <span style={{ fontSize: 11, color: "var(--ant-color-text-tertiary)" }}>
+                📦 {extPlugins.length} 外部 · {extPlugins.reduce((s, p) => s + p.features.length, 0)} features
+              </span>
+            )}
+          </div>
+
+          {items.length === 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "70%",
+                color: "var(--ant-color-text-tertiary)",
+                gap: 8,
+                fontSize: 13,
+              }}
+            >
+              <SearchOutlined style={{ fontSize: 28, opacity: 0.3 }} />
+              <span>没有匹配的功能</span>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>试试: base64 / uuid / json / http / 时间戳</span>
+            </div>
+          ) : (
+            <div>
+              {items.map((t) => (
+                <FeatureRow
+                  key={t.key}
+                  tool={t}
+                  active={t.key === activeKey}
+                  onClick={() => onSelect(t.key)}
+                  onHover={() => setActiveKey(t.key)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 底部: 状态栏 */}
       <div
         style={{
-          padding: "6px 16px",
+          padding: "6px 12px",
           borderTop: "1px solid var(--ant-color-border-secondary)",
           display: "flex",
           alignItems: "center",
@@ -277,17 +512,26 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
           color: "var(--ant-color-text-tertiary)",
         }}
       >
-        <Space>
-          <KeyHint icon={<ArrowUpOutlined />} icon2={<ArrowDownOutlined />} label="切换" />
-          <KeyHint icon={<EnterOutlined />} label="打开" />
-          <KeyHint label="esc 关闭" />
-          {extPlugins.length > 0 && (
-            <Tag color="purple" style={{ margin: 0, fontSize: 10 }}>
-              {extPlugins.length} 外部插件 · {extPlugins.reduce((s, p) => s + p.features.length, 0)} features
-            </Tag>
-          )}
-        </Space>
-        <Space>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Hint label="↑↓ 选择" />
+          <Hint label="⏎ 打开" />
+          <Hint label="esc 关闭" />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={onOpenMarket}
+            style={{
+              background: "transparent",
+              border: 0,
+              color: "var(--ant-color-text-tertiary)",
+              cursor: "pointer",
+              fontSize: 11,
+              padding: "2px 6px",
+            }}
+          >
+            ◉ 插件应用市场
+          </button>
+          <span style={{ color: "var(--ant-color-border-secondary)" }}>|</span>
           <button
             onClick={async () => {
               try {
@@ -300,11 +544,10 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
               color: "var(--ant-color-text-tertiary)",
               cursor: "pointer",
               fontSize: 11,
-              padding: 0,
+              padding: "2px 6px",
             }}
-            title="打开插件目录"
           >
-            打开插件目录
+            📁 打开目录
           </button>
           <button
             onClick={() => extRefresh()}
@@ -315,11 +558,10 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
               color: "var(--ant-color-text-tertiary)",
               cursor: extLoading ? "wait" : "pointer",
               fontSize: 11,
-              padding: 0,
+              padding: "2px 6px",
             }}
-            title="刷新外部插件"
           >
-            {extLoading ? "刷新中..." : "刷新"}
+            {extLoading ? "刷新中..." : "🔄 刷新"}
           </button>
           <button
             onClick={onClose}
@@ -329,96 +571,217 @@ export function Spotlight({ onSelect, onClose }: SpotlightProps) {
               color: "var(--ant-color-text-tertiary)",
               cursor: "pointer",
               fontSize: 11,
-              padding: 0,
-              marginLeft: 8,
+              padding: "2px 6px",
             }}
+            title="关闭主窗口"
           >
             <CloseOutlined /> 关闭
           </button>
-        </Space>
+        </div>
       </div>
     </div>
   );
 }
 
-function ToolIcon({ tool, isActive, onClick }: { tool: ToolMeta; isActive: boolean; onClick: () => void }) {
+function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div
+        style={{
+          padding: "4px 12px",
+          fontSize: 11,
+          color: "var(--ant-color-text-tertiary)",
+          fontWeight: 500,
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function NavItem({
+  icon,
+  label,
+  active,
+  onClick,
+  badge,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+  badge?: number;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "6px 12px",
+        margin: "1px 0",
+        borderRadius: 6,
+        background: active ? "var(--ant-color-fill-tertiary)" : "transparent",
+        cursor: "pointer",
+        fontSize: 13,
+        color: active ? "var(--ant-color-primary)" : "var(--ant-color-text)",
+        fontWeight: active ? 500 : 400,
+        transition: "background 0.1s",
+      }}
+    >
+      <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+        <span style={{ display: "inline-flex", width: 16, color: active ? "var(--ant-color-primary)" : "var(--ant-color-text-tertiary)" }}>
+          {icon}
+        </span>
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {label}
+        </span>
+      </span>
+      {badge !== undefined && badge > 0 && (
+        <span
+          style={{
+            fontSize: 10,
+            color: "var(--ant-color-text-tertiary)",
+            background: "var(--ant-color-fill-tertiary)",
+            padding: "0 5px",
+            borderRadius: 8,
+            minWidth: 18,
+            textAlign: "center",
+          }}
+        >
+          {badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TabButton({ children, active }: { children: React.ReactNode; active?: boolean }) {
+  return (
+    <div
+      style={{
+        padding: "3px 10px",
+        borderRadius: 4,
+        fontSize: 12,
+        background: active ? "var(--ant-color-primary-bg)" : "transparent",
+        color: active ? "var(--ant-color-primary)" : "var(--ant-color-text)",
+        fontWeight: active ? 500 : 400,
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FeatureRow({
+  tool,
+  active,
+  onClick,
+  onHover,
+}: {
+  tool: ToolMeta;
+  active: boolean;
+  onClick: () => void;
+  onHover: () => void;
+}) {
   return (
     <div
       data-sp-idx={tool.key}
       onClick={onClick}
-      onMouseEnter={() => {}} // 实际 active 由父级 set
+      onMouseEnter={onHover}
       style={{
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        padding: "10px 4px 8px",
-        borderRadius: 10,
-        background: isActive ? "var(--ant-color-primary-bg)" : "transparent",
-        border: isActive ? "1.5px solid var(--ant-color-primary)" : "1.5px solid transparent",
+        gap: 12,
+        padding: "8px 16px",
+        background: active ? "var(--ant-color-primary-bg)" : "transparent",
+        borderLeft: active ? "2px solid var(--ant-color-primary)" : "2px solid transparent",
         cursor: "pointer",
-        transition: "all 0.1s",
-        userSelect: "none",
+        transition: "background 0.08s",
       }}
-      onMouseDown={(e) => e.preventDefault()}
     >
-      <div
+      <span
         style={{
-          fontSize: 26,
-          lineHeight: 1,
-          color: isActive ? "var(--ant-color-primary)" : "var(--ant-color-text)",
-          marginBottom: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: 30,
+          display: "inline-flex",
+          width: 22,
+          height: 22,
+          fontSize: 16,
+          color: active ? "var(--ant-color-primary)" : "var(--ant-color-text)",
         }}
       >
         {tool.icon}
-      </div>
-      <div
+      </span>
+      <span
         style={{
-          fontSize: 11,
-          color: isActive ? "var(--ant-color-primary)" : "var(--ant-color-text)",
-          textAlign: "center",
-          lineHeight: 1.2,
-          width: "100%",
+          fontSize: 13,
+          color: active ? "var(--ant-color-primary)" : "var(--ant-color-text)",
+          fontWeight: active ? 500 : 400,
+          flex: "0 0 auto",
+        }}
+      >
+        {tool.label}
+      </span>
+      {tool.cmds && tool.cmds.length > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginLeft: 4 }}>
+          {tool.cmds.slice(0, 3).map((c) => (
+            <span
+              key={c}
+              style={{
+                fontSize: 11,
+                padding: "1px 8px",
+                background: "var(--ant-color-primary-bg)",
+                color: "var(--ant-color-primary)",
+                borderRadius: 10,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+      <span
+        style={{
+          flex: 1,
+          fontSize: 12,
+          color: "var(--ant-color-text-tertiary)",
+          textAlign: "right",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
-          fontWeight: isActive ? 600 : 400,
         }}
-        title={tool.label}
+        title={tool.description}
       >
-        {tool.label}
-      </div>
+        {tool.description}
+      </span>
     </div>
   );
 }
 
-function KeyHint({ icon, icon2, label }: { icon?: React.ReactNode; icon2?: React.ReactNode; label: string }) {
+function Hint({ label }: { label: string }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, marginRight: 8 }}>
-      {icon && (
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 1,
-            padding: "1px 5px",
-            background: "var(--ant-color-fill-tertiary)",
-            borderRadius: 3,
-            fontSize: 10,
-          }}
-        >
-          {icon} {icon2}
-        </span>
-      )}
-      <span>{label}</span>
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "1px 6px",
+        background: "var(--ant-color-fill-tertiary)",
+        borderRadius: 3,
+        fontSize: 10,
+      }}
+    >
+      {label}
     </span>
   );
-}
-
-function Space({ children }: { children: React.ReactNode }) {
-  return <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{children}</span>;
 }

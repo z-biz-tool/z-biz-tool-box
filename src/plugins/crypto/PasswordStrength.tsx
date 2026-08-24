@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "pwdstr",
   label: "密码强度",
   description: "密码强度评分与建议",
+  cmds: ["pwdstr", "password strength", "密码强度"],
   icon: "shield",
 };
 

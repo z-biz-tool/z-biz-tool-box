@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "exchange",
   label: "汇率换算",
   description: "在线/离线参考汇率",
+  cmds: ["exchange", "currency", "汇率", "汇率换算"],
   icon: "dollar",
 };
 

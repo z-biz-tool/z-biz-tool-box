@@ -6,6 +6,7 @@ export const meta: PluginMeta = {
   key: "hash",
   label: "哈希计算",
   description: "MD5/SHA 哈希摘要",
+  cmds: ["hash", "md5", "sha", "md5 sha", "哈希"],
   icon: "key",
 };
 

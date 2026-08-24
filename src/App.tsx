@@ -101,6 +101,7 @@ export default function App() {
           <Spotlight
             onSelect={setActiveKey}
             onClose={hideWindow}
+            onOpenMarket={() => setActiveKey("market")}
           />
         ) : (
           <ToolView
