@@ -2,23 +2,26 @@ import { useEffect, useState } from "react";
 import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ThemeProvider, Spotlight, EmptyState } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState } from "./_shared";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 
 /**
- * 路由 active key:
- *  - "spotlight" → 主入口(默认)
- *  - 内置插件: 直接是 key, 如 "base64"
- *  - 外部插件: "ext::<pluginId>::<featureCode>"
+ * activeKey 模式:
+ *  - "spotlight"  → 主面板 (默认)
+ *  - "market"     → 插件应用市场
+ *  - 内置插件:   直接是 key, 如 "base64"
+ *  - 外部插件:   "ext::<pluginId>::<featureCode>"
  */
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
+  | { kind: "market" }
   | { kind: "external"; pluginId: string; featureCode: string }
   | { kind: "builtin" } {
   if (key === "spotlight") return { kind: "spotlight" };
+  if (key === "market") return { kind: "market" };
   if (key.startsWith("ext::")) {
     const [, pluginId, featureCode] = key.split("::");
     return { kind: "external", pluginId, featureCode };
@@ -31,30 +34,31 @@ export default function App() {
   const pushRecent = useUiStore((s) => s.pushRecent);
   const extPlugins = useExtStore((s) => s.plugins);
 
-  // 启动时扫描外部插件目录
   useEffect(() => {
     initExtStore();
   }, []);
 
-  // 进入工具即记入 recent (spotlight 不计)
+  // 进入工具即记入 recent (spotlight/market 不计)
   useEffect(() => {
-    if (activeKey !== "spotlight") pushRecent(activeKey);
+    const k = activeKey;
+    if (k !== "spotlight" && k !== "market") pushRecent(k);
   }, [activeKey, pushRecent]);
 
-  // 监听 ⌘K → 聚焦 spotlight 搜索框 (在 spotlight 模式唤起 QuickOpen 不必要)
-  // 监听 esc → 关闭主窗口
+  // 监听 ⌘K (在 spotlight 模式唤起 QuickOpen 切工具), esc 关闭
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (activeKey !== "spotlight") {
-          // 工具模式按 esc → 返回 spotlight
+        if (activeKey === "market") {
           setActiveKey("spotlight");
           e.preventDefault();
-        } else {
-          // spotlight 模式按 esc → 关闭主窗口
+        } else if (activeKey === "spotlight") {
           getCurrentWindow()
             .hide()
             .catch(() => {});
+          e.preventDefault();
+        } else {
+          // 工具模式按 esc → 返回 spotlight
+          setActiveKey("spotlight");
           e.preventDefault();
         }
       }
@@ -70,7 +74,6 @@ export default function App() {
     ? extPlugins.find((p) => p.id === active.pluginId)
     : undefined;
 
-  // 浮层窗口控制
   const hideWindow = async () => {
     try {
       await getCurrentWindow().hide();
@@ -102,6 +105,11 @@ export default function App() {
             onSelect={setActiveKey}
             onClose={hideWindow}
             onOpenMarket={() => setActiveKey("market")}
+          />
+        ) : active.kind === "market" ? (
+          <MarketView
+            onClose={hideWindow}
+            onBack={() => setActiveKey("spotlight")}
           />
         ) : (
           <ToolView
