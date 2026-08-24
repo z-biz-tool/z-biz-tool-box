@@ -12,11 +12,15 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "z-biz-tool-box",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
-        "minHeight": 500
+        "width": 880,
+        "height": 600,
+        "minWidth": 720,
+        "minHeight": 460,
+        "visible": false,
+        "center": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

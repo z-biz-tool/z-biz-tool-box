@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Menu, Typography, Tag } from "antd";
 import { ToolOutlined } from "@ant-design/icons";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { AppShell, ThemeProvider, QuickOpen } from "./_shared";
 import { TOOL_GROUPS, getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
@@ -33,6 +35,28 @@ export default function App() {
     label: g.label,
     children: g.tools.map((t) => ({ key: t.key, icon: t.icon, label: t.label })),
   }));
+
+  // 把启用的工具列表注册给 Rust,用于构建菜单栏(tray)的下拉菜单
+  useEffect(() => {
+    const groups = visibleGroups.map((g) => ({
+      key: g.key,
+      label: g.label,
+      tools: g.tools.map((t) => ({ key: t.key, label: t.label })),
+    }));
+    invoke("register_tools", { groups }).catch((err) => {
+      console.warn("[tray] register_tools failed:", err);
+    });
+  }, [visibleGroups]);
+
+  // 监听来自菜单栏的"选择工具"事件
+  useEffect(() => {
+    const unlisten = listen<string>("select-tool", (e) => {
+      setActivePlugin(e.payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   return (
     <ThemeProvider>
