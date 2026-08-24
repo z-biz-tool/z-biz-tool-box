@@ -18,6 +18,7 @@ pub fn run() {
             commands::greet,
             register_tools,
             plugin_engine::http_request,
+            get_state,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
@@ -37,9 +38,11 @@ pub fn run() {
             app.global_shortcut()
                 .on_shortcut(shortcut, move |_app, _scut, event| {
                     if event.state == ShortcutState::Pressed {
+                        eprintln!("[z-biz] ⌥Space pressed → toggle_main_window");
                         toggle_main_window(&app_handle);
                     }
                 })?;
+            eprintln!("[z-biz] registered ⌥Space global shortcut");
 
             // 备用快捷键 ⌃⌘K (Ctrl+Cmd+K) — 不冲突,作为 alt+space 被抢的 fallback
             let shortcut2 = Shortcut::new(
@@ -50,9 +53,11 @@ pub fn run() {
             app.global_shortcut()
                 .on_shortcut(shortcut2, move |_app, _scut, event| {
                     if event.state == ShortcutState::Pressed {
+                        eprintln!("[z-biz] ⌃⌘K pressed → toggle_main_window");
                         toggle_main_window(&app_handle2);
                     }
                 })?;
+            eprintln!("[z-biz] registered ⌃⌘K fallback shortcut");
 
             // 主窗口: 关掉时隐藏(不退出进程),保持菜单栏常驻
             if let Some(win) = app.get_webview_window("main") {
@@ -76,6 +81,18 @@ pub fn run() {
 #[tauri::command]
 fn register_tools(app: tauri::AppHandle, groups: Vec<GroupEntry>) -> Result<(), String> {
     refresh_menu(&app, &groups).map_err(|e| e.to_string())
+}
+
+/// 测试命令: 只读, 返回主窗口当前状态
+#[tauri::command]
+fn get_state(app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(w) = app.get_webview_window("main") {
+        let visible = w.is_visible().unwrap_or(false);
+        let focused = w.is_focused().unwrap_or(false);
+        let minimized = w.is_minimized().unwrap_or(false);
+        return Ok(format!("visible={} focused={} minimized={}", visible, focused, minimized));
+    }
+    Ok("(no main window)".into())
 }
 
 // 抑制 show_main_window 未使用警告(它由快捷键 handler 引用)
