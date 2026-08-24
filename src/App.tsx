@@ -7,14 +7,8 @@ import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
+import { radius, shadow, size, motion } from "./_shared/designTokens";
 
-/**
- * activeKey 模式:
- *  - "spotlight"  → 主面板 (默认)
- *  - "market"     → 插件应用市场
- *  - 内置插件:   直接是 key, 如 "base64"
- *  - 外部插件:   "ext::<pluginId>::<featureCode>"
- */
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
   | { kind: "market" }
@@ -38,13 +32,11 @@ export default function App() {
     initExtStore();
   }, []);
 
-  // 进入工具即记入 recent (spotlight/market 不计)
   useEffect(() => {
     const k = activeKey;
     if (k !== "spotlight" && k !== "market") pushRecent(k);
   }, [activeKey, pushRecent]);
 
-  // 监听 ⌘K (在 spotlight 模式唤起 QuickOpen 切工具), esc 关闭
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -57,7 +49,6 @@ export default function App() {
             .catch(() => {});
           e.preventDefault();
         } else {
-          // 工具模式按 esc → 返回 spotlight
           setActiveKey("spotlight");
           e.preventDefault();
         }
@@ -90,16 +81,42 @@ export default function App() {
       <div
         style={{
           height: "100vh",
-          borderRadius: 12,
+          borderRadius: size.floatingRadius,
           overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-          border: "1px solid var(--ant-color-border-secondary)",
+          boxShadow: shadow.floating,
           background: "var(--ant-color-bg-container)",
           display: "flex",
           flexDirection: "column",
           position: "relative",
+          // macOS Sonoma 风格浮层: 边缘高光 + 背景柔化
+          border: "1px solid rgba(0,0,0,0.06)",
+          // 入场动画 (CSS 端 fade-in + scale)
+          animation: "zBizFadeIn 0.16s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
+        <style>{`
+          @keyframes zBizFadeIn {
+            from { opacity: 0; transform: scale(0.98) translateY(-4px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          @keyframes zBizSlideIn {
+            from { opacity: 0; transform: translateX(-6px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes zBizPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.32); }
+            50% { box-shadow: 0 0 0 6px rgba(99,102,241,0); }
+          }
+          .zBizScroll::-webkit-scrollbar { width: 8px; height: 8px; }
+          .zBizScroll::-webkit-scrollbar-track { background: transparent; }
+          .zBizScroll::-webkit-scrollbar-thumb {
+            background: var(--ant-color-fill-tertiary);
+            border-radius: 999px;
+          }
+          .zBizScroll::-webkit-scrollbar-thumb:hover {
+            background: var(--ant-color-text-quaternary);
+          }
+        `}</style>
         {active.kind === "spotlight" ? (
           <Spotlight
             onSelect={setActiveKey}
@@ -159,9 +176,12 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "8px 12px",
+          padding: "10px 14px",
           borderBottom: "1px solid var(--ant-color-border-secondary)",
-          background: "var(--ant-color-bg-container)",
+          background:
+            "linear-gradient(180deg, var(--ant-color-bg-container) 0%, transparent 100%)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -171,18 +191,41 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
               type="text"
               icon={<ArrowLeftOutlined />}
               onClick={onBack}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+              }}
             />
           </Tooltip>
-          <Typography.Text strong style={{ fontSize: 14 }}>
+          <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
             {title}
           </Typography.Text>
           {group && (
-            <Tag color="blue" style={{ fontSize: 11 }}>
+            <Tag
+              color="blue"
+              style={{
+                fontSize: 11,
+                borderRadius: 6,
+                padding: "0 8px",
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
               {group}
             </Tag>
           )}
           {isExternal && (
-            <Tag color="purple" style={{ fontSize: 11 }}>
+            <Tag
+              color="purple"
+              style={{
+                fontSize: 11,
+                borderRadius: 6,
+                padding: "0 8px",
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
               外部插件
             </Tag>
           )}
@@ -194,6 +237,7 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
               type="text"
               icon={<MinusOutlined />}
               onClick={onMinimize}
+              style={{ width: 28, height: 28, borderRadius: 8 }}
             />
           </Tooltip>
           <Tooltip title="隐藏 (⌥Space)">
@@ -202,13 +246,24 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
               type="text"
               icon={<CloseOutlined />}
               onClick={onClose}
+              style={{ width: 28, height: 28, borderRadius: 8 }}
             />
           </Tooltip>
         </div>
       </div>
-      <div style={{ flex: 1, overflow: "auto", background: "var(--ant-color-bg-layout)" }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+          background: "var(--ant-color-bg-layout)",
+        }}
+        className="zBizScroll"
+      >
         {children}
       </div>
     </div>
   );
 }
+
+// re-export for tree-shake safety
+export { radius, shadow, size, motion };

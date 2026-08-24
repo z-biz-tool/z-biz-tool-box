@@ -408,41 +408,73 @@ export function MarketView({ onClose, onBack }: MarketViewProps) {
                     gridTemplateColumns: "2fr 1fr 1fr",
                     gridTemplateRows: "1fr 1fr",
                     gap: 12,
-                    height: 200,
+                    height: 220,
                   }}
                 >
                   {/* 大卡 (左 1 大, 占 2 行) */}
                   <div
+                    className="zBizMarketCard"
                     style={{
                       gridRow: "1 / 3",
                       gridColumn: "1 / 2",
-                      borderRadius: 12,
+                      borderRadius: 14,
                       background: featured.big.bg,
-                      padding: 20,
+                      padding: 22,
                       color: "white",
                       cursor: "pointer",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      boxShadow:
+                        "0 4px 16px -4px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset",
+                      position: "relative",
+                      overflow: "hidden",
+                      transition: "all 0.24s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform =
+                        "translateY(-2px) scale(1.01)";
+                      (e.currentTarget as HTMLElement).style.boxShadow =
+                        "0 12px 32px -8px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.15) inset";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)";
+                      (e.currentTarget as HTMLElement).style.boxShadow =
+                        "0 4px 16px -4px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset";
                     }}
                   >
-                    <div style={{ fontSize: 36, color: "rgba(255,255,255,0.9)" }}>
+                    {/* 装饰圆环 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: -40,
+                        top: -40,
+                        width: 160,
+                        height: 160,
+                        borderRadius: "50%",
+                        background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div style={{ fontSize: 40, color: "rgba(255,255,255,0.95)", position: "relative" }}>
                       {featured.big.icon}
                     </div>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+                    <div style={{ position: "relative" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6, letterSpacing: 0.3 }}>
                         {featured.big.name}
                       </div>
-                      <div style={{ fontSize: 12, opacity: 0.9 }}>{featured.big.desc}</div>
+                      <div style={{ fontSize: 12, opacity: 0.92, lineHeight: 1.4 }}>
+                        {featured.big.desc}
+                      </div>
                     </div>
                   </div>
                   {/* 4 个小卡 */}
                   {featured.small.map((s, i) => (
                     <div
                       key={i}
+                      className="zBizMarketCard"
                       style={{
-                        borderRadius: 10,
+                        borderRadius: 12,
                         background: s.bg,
                         padding: 14,
                         color: "white",
@@ -450,13 +482,44 @@ export function MarketView({ onClose, onBack }: MarketViewProps) {
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+                        boxShadow:
+                          "0 2px 8px -2px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,255,255,0.1) inset",
+                        position: "relative",
+                        overflow: "hidden",
+                        transition: "all 0.16s cubic-bezier(0.4, 0, 0.2, 1)",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform =
+                          "translateY(-3px) scale(1.02)";
+                        (e.currentTarget as HTMLElement).style.boxShadow =
+                          "0 8px 24px -4px rgba(0,0,0,0.24), 0 0 0 1px rgba(255,255,255,0.18) inset";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform =
+                          "translateY(0) scale(1)";
+                        (e.currentTarget as HTMLElement).style.boxShadow =
+                          "0 2px 8px -2px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,255,255,0.1) inset";
                       }}
                     >
-                      <div style={{ fontSize: 22, color: "rgba(255,255,255,0.9)" }}>{s.icon}</div>
+                      <div
+                        style={{
+                          fontSize: 24,
+                          color: "rgba(255,255,255,0.95)",
+                          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.2))",
+                        }}
+                      >
+                        {s.icon}
+                      </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                        <div style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.3, marginTop: 2 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>{s.name}</div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            opacity: 0.88,
+                            lineHeight: 1.35,
+                            marginTop: 2,
+                          }}
+                        >
                           {s.desc}
                         </div>
                       </div>
@@ -478,6 +541,7 @@ export function MarketView({ onClose, onBack }: MarketViewProps) {
                   {rankings.map((r) => (
                     <div
                       key={r.title}
+                      className="zBizRankingItem"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -488,14 +552,50 @@ export function MarketView({ onClose, onBack }: MarketViewProps) {
                         color: "var(--ant-color-text)",
                         cursor: "pointer",
                         minHeight: 56,
+                        transition: "all 0.16s cubic-bezier(0.4, 0, 0.2, 1)",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform =
+                          "translateY(-1px)";
+                        (e.currentTarget as HTMLElement).style.boxShadow =
+                          "0 4px 12px -2px rgba(0,0,0,0.12)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                        (e.currentTarget as HTMLElement).style.boxShadow = "none";
                       }}
                     >
-                      <div style={{ fontSize: 24 }}>{r.icon}</div>
+                      <div
+                        style={{
+                          fontSize: 24,
+                          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
+                        }}
+                      >
+                        {r.icon}
+                      </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{r.title}</div>
-                        <div style={{ fontSize: 11, color: "var(--ant-color-text-tertiary)", marginTop: 2 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>
+                          {r.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--ant-color-text-tertiary)",
+                            marginTop: 2,
+                          }}
+                        >
                           {r.desc}
                         </div>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--ant-color-text-tertiary)",
+                        }}
+                      >
+                        ›
                       </div>
                     </div>
                   ))}
