@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { Menu, Typography, Tag, Button, Tooltip } from "antd";
-import { ToolOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { Tag, Typography, Button, Tooltip } from "antd";
+import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AppShell, ThemeProvider, QuickOpen } from "./_shared";
-import { TOOL_GROUPS, getTool, getGroupOfTool } from "./tools";
+import { ThemeProvider, Spotlight, EmptyState } from "./_shared";
+import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 
 /**
- * activePlugin key 约定:
+ * 路由 active key:
+ *  - "spotlight" → 主入口(默认)
  *  - 内置插件: 直接是 key, 如 "base64"
- *  - 外部插件: "ext::<pluginId>::<featureCode>" (按 feature 触发,而不是 plugin)
+ *  - 外部插件: "ext::<pluginId>::<featureCode>"
  */
-function parseActiveKey(key: string): { kind: "builtin" } | { kind: "external"; pluginId: string; featureCode: string } {
+function parseActiveKey(key: string):
+  | { kind: "spotlight" }
+  | { kind: "external"; pluginId: string; featureCode: string }
+  | { kind: "builtin" } {
+  if (key === "spotlight") return { kind: "spotlight" };
   if (key.startsWith("ext::")) {
     const [, pluginId, featureCode] = key.split("::");
     return { kind: "external", pluginId, featureCode };
@@ -22,11 +27,8 @@ function parseActiveKey(key: string): { kind: "builtin" } | { kind: "external"; 
 }
 
 export default function App() {
-  const [activePlugin, setActivePlugin] = useState("base64");
-  const activeTool = getTool(activePlugin);
-  const activeGroup = getGroupOfTool(activePlugin);
+  const [activeKey, setActiveKey] = useState<string>("spotlight");
   const pushRecent = useUiStore((s) => s.pushRecent);
-  const disabled = useUiStore((s) => s.disabled);
   const extPlugins = useExtStore((s) => s.plugins);
 
   // 启动时扫描外部插件目录
@@ -34,62 +36,36 @@ export default function App() {
     initExtStore();
   }, []);
 
-  // 进入插件即记入 recent(供 ⌘K 面板使用)
+  // 进入工具即记入 recent (spotlight 不计)
   useEffect(() => {
-    if (activePlugin) pushRecent(activePlugin);
-  }, [activePlugin, pushRecent]);
+    if (activeKey !== "spotlight") pushRecent(activeKey);
+  }, [activeKey, pushRecent]);
 
-  // 监听 esc → 隐藏主窗口
+  // 监听 ⌘K → 聚焦 spotlight 搜索框 (在 spotlight 模式唤起 QuickOpen 不必要)
+  // 监听 esc → 关闭主窗口
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // 如果 QuickOpen 开着,不抢(QuickOpen 自己处理)
-        const qo = document.querySelector(".ant-modal-wrap:not([style*='display: none'])");
-        if (qo) return;
-        // 隐藏主窗口
-        getCurrentWindow()
-          .hide()
-          .catch(() => {});
+        if (activeKey !== "spotlight") {
+          // 工具模式按 esc → 返回 spotlight
+          setActiveKey("spotlight");
+          e.preventDefault();
+        } else {
+          // spotlight 模式按 esc → 关闭主窗口
+          getCurrentWindow()
+            .hide()
+            .catch(() => {});
+          e.preventDefault();
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [activeKey]);
 
-  // 过滤掉禁用的内置工具
-  const visibleGroups = useMemo(
-    () =>
-      TOOL_GROUPS.map((g) => ({
-        ...g,
-        tools: g.tools.filter((t) => !disabled.includes(t.key)),
-      })).filter((g) => g.tools.length > 0),
-    [disabled]
-  );
-
-  // 内置 + 外部(如果启用) 合并侧边栏菜单
-  const menuItems = useMemo(() => {
-    const builtin = visibleGroups.map((g) => ({
-      key: g.key,
-      icon: g.icon,
-      label: g.label,
-      children: g.tools.map((t) => ({ key: t.key, icon: t.icon, label: t.label })),
-    }));
-    const external = extPlugins
-      .filter((p) => !p.error)
-      .map((p) => ({
-        key: `ext-group-${p.id}`,
-        icon: p.logoUrl ? <img src={p.logoUrl} style={{ width: 14, height: 14 }} /> : <ToolOutlined />,
-        label: `📦 ${p.name}`,
-        children: p.features.map((f) => ({
-          key: `ext::${p.id}::${f.code}`,
-          label: f.explain,
-        })),
-      }));
-    return [...builtin, ...external];
-  }, [visibleGroups, extPlugins]);
-
-  // 解析当前激活的 key
-  const active = parseActiveKey(activePlugin);
+  const active = parseActiveKey(activeKey);
+  const activeTool = active.kind === "builtin" ? getTool(activeKey) : undefined;
+  const activeGroup = active.kind === "builtin" ? getGroupOfTool(activeKey) : undefined;
   const extPlugin = active.kind === "external"
     ? extPlugins.find((p) => p.id === active.pluginId)
     : undefined;
@@ -108,78 +84,122 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <AppShell
-        title="z-biz-tool-box"
-        icon={<ToolOutlined />}
-        sidebar={
-          <Menu
-            mode="inline"
-            defaultOpenKeys={[...TOOL_GROUPS.map((g) => g.key), ...extPlugins.map((p) => `ext-group-${p.id}`)]}
-            selectedKeys={[activePlugin]}
-            items={menuItems}
-            onClick={(e) => setActivePlugin(e.key)}
-            style={{ borderRight: 0, height: "100%" }}
-          />
-        }
-        headerExtra={
-          <div data-tauri-drag-region style={{ display: "flex", gap: 4 }}>
-            <Tooltip title="最小化">
-              <Button
-                size="small"
-                type="text"
-                icon={<MinusOutlined />}
-                onClick={minimizeWindow}
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-              />
-            </Tooltip>
-            <Tooltip title="隐藏 (esc)">
-              <Button
-                size="small"
-                type="text"
-                icon={<CloseOutlined />}
-                onClick={hideWindow}
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-              />
-            </Tooltip>
-          </div>
-        }
+      <div
+        style={{
+          height: "100vh",
+          borderRadius: 12,
+          overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          border: "1px solid var(--ant-color-border-secondary)",
+          background: "var(--ant-color-bg-container)",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
+        }}
       >
-        <div
-          data-tauri-drag-region
-          style={{
-            padding: "12px 24px",
-            borderBottom: "1px solid var(--ant-color-border-secondary)",
-            background: "var(--ant-color-bg-container)",
-            cursor: "default",
-          }}
-        >
-          <Typography.Title level={4} style={{ margin: 0, WebkitAppRegion: "drag" } as React.CSSProperties}>
-            {activeTool?.label ?? (extPlugin ? extPlugin.name : "工具箱")}
-            {activeGroup && (
-              <Tag color="blue" style={{ marginLeft: 12, fontSize: 12 }}>
-                {activeGroup.label}
-              </Tag>
+        {active.kind === "spotlight" ? (
+          <Spotlight
+            onSelect={setActiveKey}
+            onClose={hideWindow}
+          />
+        ) : (
+          <ToolView
+            title={activeTool?.label ?? (extPlugin?.name ?? "工具")}
+            group={activeGroup?.label}
+            isExternal={active.kind === "external"}
+            onBack={() => setActiveKey("spotlight")}
+            onMinimize={minimizeWindow}
+            onClose={hideWindow}
+          >
+            {active.kind === "builtin" && activeTool ? (
+              activeTool.render()
+            ) : active.kind === "external" && extPlugin ? (
+              <PluginIframe plugin={extPlugin} />
+            ) : (
+              <EmptyState title="工具未加载" description="外部插件可能已被移除" />
             )}
-            {active.kind === "external" && (
-              <Tag color="purple" style={{ marginLeft: 12, fontSize: 12 }}>
-                外部插件
-              </Tag>
-            )}
-          </Typography.Title>
-        </div>
-        <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {active.kind === "builtin" ? (
-            <div style={{ padding: 24, height: "100%", overflow: "auto" }}>{activeTool?.render() ?? <div>选择一个工具</div>}</div>
-          ) : extPlugin ? (
-            <PluginIframe plugin={extPlugin} />
-          ) : (
-            <div style={{ padding: 24 }}>
-              <p>外部插件 "{active.pluginId}" 未加载</p>
-            </div>
+          </ToolView>
+        )}
+      </div>
+    </ThemeProvider>
+  );
+}
+
+interface ToolViewProps {
+  title: string;
+  group?: string;
+  isExternal?: boolean;
+  onBack: () => void;
+  onMinimize: () => void;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, children }: ToolViewProps) {
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--ant-color-bg-container)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 12px",
+          borderBottom: "1px solid var(--ant-color-border-secondary)",
+          background: "var(--ant-color-bg-container)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Tooltip title="返回 (esc)">
+            <Button
+              size="small"
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={onBack}
+            />
+          </Tooltip>
+          <Typography.Text strong style={{ fontSize: 14 }}>
+            {title}
+          </Typography.Text>
+          {group && (
+            <Tag color="blue" style={{ fontSize: 11 }}>
+              {group}
+            </Tag>
+          )}
+          {isExternal && (
+            <Tag color="purple" style={{ fontSize: 11 }}>
+              外部插件
+            </Tag>
           )}
         </div>
-      </AppShell>
-      <QuickOpen onSelect={setActivePlugin} />
-    </ThemeProvider>
+        <div style={{ display: "flex", gap: 2 }}>
+          <Tooltip title="最小化">
+            <Button
+              size="small"
+              type="text"
+              icon={<MinusOutlined />}
+              onClick={onMinimize}
+            />
+          </Tooltip>
+          <Tooltip title="隐藏 (⌥Space)">
+            <Button
+              size="small"
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={onClose}
+            />
+          </Tooltip>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", background: "var(--ant-color-bg-layout)" }}>
+        {children}
+      </div>
+    </div>
   );
 }
