@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { MarketIndex, MarketSource } from "../plugins/external/types";
 
 export type ThemeMode = "light" | "dark";
 
@@ -23,6 +24,12 @@ interface UiState {
    */
   disabled: string[];
 
+  /**
+   * 用户配置的远程市场源(URL 列表)。每个源可拉取一个 MarketIndex。
+   * 持久化在 localStorage,启用/禁用/增删改查都在这里。
+   */
+  marketSources: MarketSource[];
+
   toggleTheme: () => void;
   setTheme: (t: ThemeMode) => void;
 
@@ -37,6 +44,19 @@ interface UiState {
   toggleDisabled: (key: string) => void;
   isDisabled: (key: string) => boolean;
   setDisabled: (disabled: string[]) => void;
+
+  // ---- 市场源操作 ----
+  addMarketSource: (url: string, label?: string) => string;
+  removeMarketSource: (id: string) => void;
+  toggleMarketSource: (id: string) => void;
+  renameMarketSource: (id: string, label: string) => void;
+  setMarketSourceCache: (id: string, index: MarketIndex) => void;
+  setMarketSourceError: (id: string, error: string) => void;
+}
+
+/** 生成简短的本地唯一 id(无外部依赖) */
+function genId(): string {
+  return `ms_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export const useUiStore = create<UiState>()(
@@ -47,6 +67,7 @@ export const useUiStore = create<UiState>()(
       recent: [],
       inputs: {},
       disabled: [],
+      marketSources: [],
 
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setTheme: (t) => set({ theme: t }),
@@ -80,16 +101,59 @@ export const useUiStore = create<UiState>()(
         })),
       isDisabled: (key) => get().disabled.includes(key),
       setDisabled: (disabled) => set({ disabled }),
+
+      // ---- 市场源 ----
+      addMarketSource: (url, label) => {
+        const id = genId();
+        set((s) => ({
+          marketSources: [
+            ...s.marketSources,
+            { id, url: url.trim(), label, enabled: true },
+          ],
+        }));
+        return id;
+      },
+      removeMarketSource: (id) =>
+        set((s) => ({
+          marketSources: s.marketSources.filter((m) => m.id !== id),
+        })),
+      toggleMarketSource: (id) =>
+        set((s) => ({
+          marketSources: s.marketSources.map((m) =>
+            m.id === id ? { ...m, enabled: !m.enabled } : m
+          ),
+        })),
+      renameMarketSource: (id, label) =>
+        set((s) => ({
+          marketSources: s.marketSources.map((m) =>
+            m.id === id ? { ...m, label: label.trim() || undefined } : m
+          ),
+        })),
+      setMarketSourceCache: (id, index) =>
+        set((s) => ({
+          marketSources: s.marketSources.map((m) =>
+            m.id === id
+              ? { ...m, cachedIndex: index, lastFetchAt: Date.now(), lastError: undefined }
+              : m
+          ),
+        })),
+      setMarketSourceError: (id, error) =>
+        set((s) => ({
+          marketSources: s.marketSources.map((m) =>
+            m.id === id ? { ...m, lastError: error } : m
+          ),
+        })),
     }),
     {
       name: "z-biz-tool-box-ui",
-      // 仅持久化这些字段
       partialize: (s) => ({
         theme: s.theme,
         starred: s.starred,
         recent: s.recent,
         inputs: s.inputs,
         disabled: s.disabled,
+        // 市场源完整持久化(配置 + 最近一次成功缓存,下次启动省一次 fetch)
+        marketSources: s.marketSources,
       }),
     }
   )

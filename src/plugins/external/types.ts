@@ -60,3 +60,86 @@ export interface ExternalPlugin extends ExternalPluginManifest {
   /** 加载时错误,如果有 */
   error?: string;
 }
+
+// =====================================================================
+// 远程市场源 (Market Source) — 用户可配置的插件仓库 URL
+// =====================================================================
+
+/**
+ * 市场源 URL 必须返回符合 MarketIndex 的 JSON。
+ * 当前 schemaVersion = 1。
+ *
+ * 校验规则(被 market.ts validateIndex 实现):
+ *   - top-level: { schemaVersion: 1, name: string, plugins: [...] }
+ *   - 每个 plugin: { id, name, version, pluginJson, mainHtml }
+ *     pluginJson: 远程 plugin.json 的 URL
+ *     mainHtml:   远程 main.html 的 URL(会被下载到本地)
+ *     logo:       远程 logo.png 的 URL(可选)
+ *
+ * 安装流程:
+ *   1. fetch(downloadUrl) → downloadUrl 是 index.json 的 URL,返回 MarketIndex
+ *   2. 用户点安装 → installer.fetchPluginFiles(plugin)
+ *      - 下载 pluginJson URL → 写到本地 plugins/{id}/plugin.json
+ *      - 下载 mainHtml URL  → 写到本地 plugins/{id}/main.html
+ *      - 下载 logo URL     → 写到本地 plugins/{id}/logo.png
+ *   3. 触发 scanner.refresh() → 跟本地插件同等待遇
+ */
+export interface MarketPluginEntry {
+  /** 插件 id,反向域名风格 */
+  id: string;
+  /** 显示名 */
+  name: string;
+  /** 描述 */
+  description: string;
+  /** 版本字符串,如 "1.0.0" */
+  version: string;
+  /** 作者 */
+  author?: string;
+  /** 主页 */
+  homepage?: string;
+  /** 标签 */
+  tags?: string[];
+  /** 远程 plugin.json 的 URL */
+  pluginJson: string;
+  /** 远程 main.html 的 URL */
+  mainHtml: string;
+  /** 远程 logo.png 的 URL(可选) */
+  logo?: string;
+}
+
+export interface MarketIndex {
+  schemaVersion: 1;
+  /** 市场显示名 */
+  name: string;
+  /** 市场描述 */
+  description?: string;
+  /** 市场主页 */
+  homepage?: string;
+  /** 最后更新时间 ISO 8601 */
+  updatedAt?: string;
+  /** 插件列表 */
+  plugins: MarketPluginEntry[];
+}
+
+/**
+ * 用户配置的市场源 — 持久化在 zustand store。
+ *
+ * url 必须 https:// 开头(本地开发可放宽到 http://localhost / 127.0.0.1)。
+ * cachedIndex 缓存最近一次成功拉取的索引,失败时不覆盖。
+ */
+export interface MarketSource {
+  /** 内部 id(uuid v4 短串) */
+  id: string;
+  /** 市场源 URL — GET 这个 URL 应返回 MarketIndex JSON */
+  url: string;
+  /** 用户给这个源起的别名(可空,默认显示 URL host) */
+  label?: string;
+  /** 是否启用 — 禁用时不参与 fetch 和显示 */
+  enabled: boolean;
+  /** 上次成功拉取时间(unix ms) */
+  lastFetchAt?: number;
+  /** 上次拉取错误信息(成功时清空) */
+  lastError?: string;
+  /** 上次成功拉取缓存的 index,失败时保留 */
+  cachedIndex?: MarketIndex;
+}
