@@ -40,7 +40,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { TOOL_GROUPS } from "../_registry";
 import { useExtStore } from "../external/store";
 import { openPluginsDir } from "../external/scanner";
-import { fetchMarketSource, validateMarketUrl } from "../external/market";
+import { fetchMarketSource, isNewer, validateMarketUrl } from "../external/market";
 import { installRemotePlugin } from "../external/installer";
 import type { MarketList, MarketPluginEntry, MarketSource } from "../external/types";
 
@@ -67,6 +67,8 @@ type RemoteItem = {
   entry: MarketPluginEntry;
   version: string;
   enabled: true; // 远程插件待安装,视为"启用可点击"
+  /** 本地已装的旧版本号 — 存在表示这是一个"有更新"项, UI 显示"更新"按钮 */
+  updateFrom?: string;
 };
 
 export default function PluginMarket() {
@@ -122,9 +124,12 @@ export default function PluginMarket() {
     );
   }, [extPlugins]);
 
-  // 远程插件(从市场源 cachedList 拉取,排除本地已安装的)
-  const installedExtIds = useMemo(
-    () => new Set(extPlugins.map((p) => p.id)),
+  // 远程插件(从市场源 cachedList 拉取)
+  // - 未装: 显示"安装"按钮
+  // - 已装但有新版: 显示"更新"按钮 + 版本对比
+  // - 已装且同版: 跳过
+  const installedExtMap = useMemo(
+    () => new Map(extPlugins.filter((p) => !p.error).map((p) => [p.id, p])),
     [extPlugins]
   );
   const remote = useMemo(() => {
@@ -132,24 +137,47 @@ export default function PluginMarket() {
     for (const src of marketSources) {
       if (!src.enabled || !src.cachedList) continue;
       for (const p of src.cachedList.plugins) {
-        if (installedExtIds.has(p.id)) continue; // 已装的不再显示
-        out.push({
-          kind: "remote",
-          key: `remote::${src.id}::${p.id}`,
-          name: p.name,
-          description: p.description || `v${p.version} · ${p.author ?? "未知作者"}`,
-          category: `🌐 ${src.cachedList.name}`,
-          sourceLabel: src.label ?? new URL(src.url).hostname,
-          sourceId: src.id,
-          source: src,
-          entry: p,
-          version: p.version,
-          enabled: true,
-        });
+        const local = installedExtMap.get(p.id);
+        if (local) {
+          // 已装: 比版本
+          const localV = local.version || "";
+          if (localV && p.version && isNewer(p.version, localV)) {
+            out.push({
+              kind: "remote",
+              key: `remote::${src.id}::${p.id}::update`,
+              name: p.name,
+              description: `v${localV} → v${p.version}`,
+              category: `🌐 ${src.cachedList.name}`,
+              sourceLabel: src.label ?? new URL(src.url).hostname,
+              sourceId: src.id,
+              source: src,
+              entry: p,
+              version: p.version,
+              enabled: true,
+              updateFrom: localV,
+            });
+          }
+          // 同版/旧版 → 跳过
+        } else {
+          // 未装
+          out.push({
+            kind: "remote",
+            key: `remote::${src.id}::${p.id}`,
+            name: p.name,
+            description: p.description || `v${p.version} · ${p.author ?? "未知作者"}`,
+            category: `🌐 ${src.cachedList.name}`,
+            sourceLabel: src.label ?? new URL(src.url).hostname,
+            sourceId: src.id,
+            source: src,
+            entry: p,
+            version: p.version,
+            enabled: true,
+          });
+        }
       }
     }
     return out;
-  }, [marketSources, installedExtIds]);
+  }, [marketSources, installedExtMap]);
 
   // 错误状态(整个 plugin 解析失败)
   const erroredPlugins = useMemo(() => extPlugins.filter((p) => p.error), [extPlugins]);
@@ -333,11 +361,14 @@ export default function PluginMarket() {
                     height: "100%",
                   }}
                   title={
-                    <Space>
+                    <Space wrap>
                       {t.kind === "external" ? (
                         <Tag color="purple">📦 外部</Tag>
                       ) : t.kind === "remote" ? (
-                        <Tag color="cyan">🌐 远程</Tag>
+                        <>
+                          <Tag color="cyan">🌐 远程</Tag>
+                          {t.updateFrom && <Tag color="orange">有新版本</Tag>}
+                        </>
                       ) : (
                         <Tag color="blue">内置</Tag>
                       )}
@@ -361,7 +392,7 @@ export default function PluginMarket() {
                         loading={installing === t.key}
                         onClick={() => handleInstall(t)}
                       >
-                        安装
+                        {t.updateFrom ? "更新" : "安装"}
                       </Button>
                     ) : null
                   }
@@ -373,8 +404,10 @@ export default function PluginMarket() {
                     <Tag style={{ fontFamily: "var(--mono-font)", fontSize: 11 }}>
                       {t.key}
                     </Tag>
-                    {t.kind === "remote" ? (
-                      <Tag>v{t.kind === "remote" ? t.version : ""}</Tag>
+                    {t.kind === "remote" && t.updateFrom ? (
+                      <Tag color="orange">v{t.updateFrom} → v{t.version}</Tag>
+                    ) : t.kind === "remote" ? (
+                      <Tag>v{t.version}</Tag>
                     ) : t.enabled ? (
                       <Tag color="green">已启用</Tag>
                     ) : (

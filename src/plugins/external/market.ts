@@ -100,6 +100,45 @@ export function logoUrl(base: string, id: string): string {
 }
 
 // =====================================================================
+// 版本比较
+// =====================================================================
+
+/**
+ * 比较两个版本字符串。
+ *  - 优先按 semver 数值:  "1.2.3" vs "1.2.10" → 后者大
+ *  - 非数字段回退到字符串比较: "20240101" vs "20231231" → 后者大 (按字典序, 也符合日期格式)
+ *  - 段数不等: 缺的视为 0 ("1.0" == "1.0.0")
+ *
+ * 返回: > 0 表示 a 新, < 0 表示 b 新, 0 相等
+ *
+ * 注意: 不处理 pre-release / build metadata (如 "1.0.0-rc.1"), 这种按字符串兜底
+ */
+export function compareVersions(a: string, b: string): number {
+  if (a === b) return 0;
+  const sa = a.split(/[.+-]/); // 拆分, 顺便也切 pre-release 段
+  const sb = b.split(/[.+-]/);
+  const len = Math.max(sa.length, sb.length);
+  for (let i = 0; i < len; i++) {
+    const xa = sa[i] ?? "0";
+    const xb = sb[i] ?? "0";
+    const na = Number(xa);
+    const nb = Number(xb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+      if (na !== nb) return na - nb;
+    } else {
+      // 非数字段: 字典序
+      if (xa !== xb) return xa < xb ? -1 : 1;
+    }
+  }
+  return 0;
+}
+
+/** a 是否比 b 新 */
+export function isNewer(a: string, b: string): boolean {
+  return compareVersions(a, b) > 0;
+}
+
+// =====================================================================
 // Schema 校验
 // =====================================================================
 
