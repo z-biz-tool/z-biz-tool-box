@@ -100,7 +100,11 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> t
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        .icon_as_template(true) // macOS 单色,跟随系统亮/暗模式
+        // 不再 .icon_as_template(true):
+        //   - icons/32x32.png 是彩色 app 图标,template 模式要求「黑色 + alpha」,
+        //     彩色图当 template 会渲染成实心白块
+        //   - 直接用彩色版,与 app 自身图标一致;若以后想跟随亮/暗模式,
+        //     应单独提供 32x32Template.png (黑色 + alpha-only) 然后再开 template
         .tooltip("z-biz-tool-box")
         .menu(&menu)
         .show_menu_on_left_click(true) // 左键点击直接展开工具列表

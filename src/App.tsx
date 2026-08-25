@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ThemeProvider, Spotlight, MarketView, EmptyState } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView } from "./_shared";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
@@ -12,10 +12,14 @@ import { radius, shadow, size, motion } from "./_shared/designTokens";
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
   | { kind: "market" }
+  | { kind: "preferences" }
+  | { kind: "shortcuts" }
   | { kind: "external"; pluginId: string; featureCode: string }
   | { kind: "builtin" } {
   if (key === "spotlight") return { kind: "spotlight" };
   if (key === "market") return { kind: "market" };
+  if (key === "preferences") return { kind: "preferences" };
+  if (key === "shortcuts") return { kind: "shortcuts" };
   if (key.startsWith("ext::")) {
     const [, pluginId, featureCode] = key.split("::");
     return { kind: "external", pluginId, featureCode };
@@ -52,6 +56,18 @@ export default function App() {
           setActiveKey("spotlight");
           e.preventDefault();
         }
+        return;
+      }
+      // 兜底 ⌥Space: WebView 获焦时,tauri-plugin-global-shortcut 的
+      // CGEvent tap 可能被 WebView 自己吞掉,这里前端直接 hide 一次,
+      // 保证「再按一次 ⌥Space 一定能关」。
+      // Rust 端 toggle_main_window 是主路径,这里只是兜底,
+      // 双重触发也安全 (hide() 幂等,重复调用没副作用)。
+      if (e.altKey && e.code === "Space") {
+        e.preventDefault();
+        getCurrentWindow()
+          .hide()
+          .catch(() => {});
       }
     };
     window.addEventListener("keydown", handler);
@@ -79,6 +95,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <div
+        data-tauri-drag-region
         style={{
           height: "100vh",
           borderRadius: size.floatingRadius,
@@ -116,18 +133,99 @@ export default function App() {
           .zBizScroll::-webkit-scrollbar-thumb:hover {
             background: var(--ant-color-text-quaternary);
           }
+          /* 顶栏拖动提示线: 4px 品牌渐变, 像 Spotlight 那种细线
+             hover 时变高变明显, 暗示"这里可以拖" */
+          .zBizDragBar {
+            height: 4px;
+            flex-shrink: 0;
+            background: linear-gradient(
+              90deg,
+              transparent 0%,
+              rgba(99, 102, 241, 0.55) 15%,
+              rgba(139, 92, 246, 0.7) 50%,
+              rgba(168, 85, 247, 0.55) 85%,
+              transparent 100%
+            );
+            cursor: grab;
+            transition: height 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.65;
+            position: relative;
+            z-index: 1;
+          }
+          .zBizDragBar:hover,
+          .zBizDragBar:active {
+            height: 6px;
+            opacity: 1;
+            cursor: grabbing;
+          }
+          .zBizDragBar:active {
+            background: linear-gradient(
+              90deg,
+              transparent 0%,
+              rgba(99, 102, 241, 0.75) 15%,
+              rgba(139, 92, 246, 0.9) 50%,
+              rgba(168, 85, 247, 0.75) 85%,
+              transparent 100%
+            );
+          }
+          /* 任何可点击/可输入的子元素,关掉继承的 drag,否则无法点 */
+          input,
+          textarea,
+          button,
+          select,
+          a,
+          [role="button"],
+          .ant-input,
+          .ant-input-affix-wrapper,
+          .ant-input-number,
+          .ant-input-search,
+          .ant-btn,
+          .ant-select,
+          .ant-select-selector,
+          .ant-select-dropdown,
+          .ant-switch,
+          .ant-tag,
+          .ant-card,
+          .ant-tabs,
+          .ant-tabs-tab,
+          .ant-tabs-tab-btn,
+          .ant-dropdown-trigger,
+          .ant-list,
+          .ant-list-item,
+          .ant-checkbox,
+          .ant-checkbox-input,
+          .ant-radio,
+          .ant-radio-input,
+          .ant-segmented,
+          .ant-segmented-item,
+          .ant-picker,
+          .ant-empty,
+          .ant-pagination,
+          [data-no-drag] {
+            -webkit-app-region: no-drag;
+          }
         `}</style>
+        <div className="zBizApp" style={{ display: "contents" }}>
+        {/* 顶栏拖动提示 — 4px 渐变线, hover 变明显, 在所有视图顶部统一显示 */}
+        <div className="zBizDragBar" title="拖动移动窗口" />
         {active.kind === "spotlight" ? (
           <Spotlight
             onSelect={setActiveKey}
             onClose={hideWindow}
             onOpenMarket={() => setActiveKey("market")}
+            onOpenPreferences={() => setActiveKey("preferences")}
+            onOpenShortcuts={() => setActiveKey("shortcuts")}
           />
         ) : active.kind === "market" ? (
           <MarketView
             onClose={hideWindow}
             onBack={() => setActiveKey("spotlight")}
           />
+        ) : active.kind === "preferences" ? (
+          <PreferencesView onBack={() => setActiveKey("spotlight")} />
+        ) : active.kind === "shortcuts" ? (
+          <ShortcutsView onBack={() => setActiveKey("spotlight")} />
         ) : (
           <ToolView
             title={activeTool?.label ?? (extPlugin?.name ?? "工具")}
@@ -146,6 +244,7 @@ export default function App() {
             )}
           </ToolView>
         )}
+        </div>
       </div>
     </ThemeProvider>
   );

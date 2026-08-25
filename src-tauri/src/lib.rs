@@ -20,6 +20,7 @@ pub fn run() {
             register_tools,
             plugin_engine::http_request,
             get_state,
+            apply_window_prefs,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
@@ -94,6 +95,32 @@ fn get_state(app: tauri::AppHandle) -> Result<String, String> {
         return Ok(format!("visible={} focused={} minimized={}", visible, focused, minimized));
     }
     Ok("(no main window)".into())
+}
+
+/// 应用窗口相关偏好(支持热生效,不用重启)
+/// 设计: 用 Tauri command 而不是 file watcher,理由
+///  1. localStorage 才是 prefs 唯一真源;直接同步调用,无 race
+///  2. 不用引入 notify crate 也不需要二次序列化
+///  3. 未来加更多 live pref(透明度/缩放/主题色)只需扩 struct
+///  4. 如果用户从外部文件改 prefs,需求用 file watcher 时再加
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WindowPrefs {
+    #[serde(default)]
+    always_on_top: bool,
+}
+
+#[tauri::command]
+fn apply_window_prefs(app: tauri::AppHandle, prefs: WindowPrefs) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("main") {
+        w.set_always_on_top(prefs.always_on_top)
+            .map_err(|e| format!("set_always_on_top 失败: {e}"))?;
+        eprintln!(
+            "[z-biz] applied window prefs: always_on_top={}",
+            prefs.always_on_top
+        );
+    }
+    Ok(())
 }
 
 // 抑制 show_main_window 未使用警告(它由快捷键 handler 引用)

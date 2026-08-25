@@ -90,8 +90,8 @@ export const motion = {
 // ============ 尺寸 ============
 export const size = {
   // 浮层
-  floatingWidth: 960,
-  floatingHeight: 560,
+  floatingWidth: 1100,
+  floatingHeight: 680,
   // 侧栏
   navWidth: 180,
   categoryWidth: 200,

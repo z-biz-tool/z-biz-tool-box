@@ -5,3 +5,5 @@ export { useCopyToClipboard, useClearAll, usePluginInput } from "./hooks";
 export { QuickOpen } from "./QuickOpen";
 export { Spotlight } from "./Spotlight";
 export { MarketView } from "./MarketView";
+export { PreferencesView } from "./PreferencesView";
+export { ShortcutsView } from "./ShortcutsView";

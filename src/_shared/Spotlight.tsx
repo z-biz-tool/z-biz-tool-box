@@ -28,6 +28,8 @@ interface SpotlightProps {
   onSelect: (key: string) => void;
   onClose: () => void;
   onOpenMarket: () => void;
+  onOpenPreferences: () => void;
+  onOpenShortcuts: () => void;
 }
 
 type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
@@ -38,7 +40,7 @@ type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
  *  - 左/中列: 极简导航, 圆角 hover/active
  *  - 右列功能行: 渐变 active 背景 + scale 1.005 + 阴影 + cmds chip 渐变
  */
-export function Spotlight({ onSelect, onClose, onOpenMarket }: SpotlightProps) {
+export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts }: SpotlightProps) {
   const [query, setQuery] = useState("");
   const [activeNav, setActiveNav] = useState<NavKey>("all");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -289,12 +291,12 @@ export function Spotlight({ onSelect, onClose, onOpenMarket }: SpotlightProps) {
             <NavItem
               icon={<SettingOutlined />}
               label="偏好设置"
-              onClick={() => {}}
+              onClick={onOpenPreferences}
             />
             <NavItem
               icon={<KeyOutlined />}
               label="快捷键"
-              onClick={() => {}}
+              onClick={onOpenShortcuts}
             />
           </NavSection>
         </div>
