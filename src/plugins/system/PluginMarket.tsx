@@ -42,7 +42,7 @@ import { useExtStore } from "../external/store";
 import { openPluginsDir } from "../external/scanner";
 import { fetchMarketSource, validateMarketUrl } from "../external/market";
 import { installRemotePlugin } from "../external/installer";
-import type { MarketPluginEntry, MarketSource } from "../external/types";
+import type { MarketList, MarketPluginEntry, MarketSource } from "../external/types";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -63,6 +63,7 @@ type RemoteItem = {
   category: string;
   sourceLabel: string;
   sourceId: string;
+  source: MarketSource; // 完整 source — installer 需要 base URL
   entry: MarketPluginEntry;
   version: string;
   enabled: true; // 远程插件待安装,视为"启用可点击"
@@ -121,7 +122,7 @@ export default function PluginMarket() {
     );
   }, [extPlugins]);
 
-  // 远程插件(从市场源 cachedIndex 拉取,排除本地已安装的)
+  // 远程插件(从市场源 cachedList 拉取,排除本地已安装的)
   const installedExtIds = useMemo(
     () => new Set(extPlugins.map((p) => p.id)),
     [extPlugins]
@@ -129,17 +130,18 @@ export default function PluginMarket() {
   const remote = useMemo(() => {
     const out: RemoteItem[] = [];
     for (const src of marketSources) {
-      if (!src.enabled || !src.cachedIndex) continue;
-      for (const p of src.cachedIndex.plugins) {
+      if (!src.enabled || !src.cachedList) continue;
+      for (const p of src.cachedList.plugins) {
         if (installedExtIds.has(p.id)) continue; // 已装的不再显示
         out.push({
           kind: "remote",
           key: `remote::${src.id}::${p.id}`,
           name: p.name,
           description: p.description || `v${p.version} · ${p.author ?? "未知作者"}`,
-          category: `🌐 ${src.cachedIndex.name}`,
+          category: `🌐 ${src.cachedList.name}`,
           sourceLabel: src.label ?? new URL(src.url).hostname,
           sourceId: src.id,
+          source: src,
           entry: p,
           version: p.version,
           enabled: true,
@@ -175,15 +177,15 @@ export default function PluginMarket() {
   const successExternalPlugins = extPlugins.filter((p) => !p.error).length;
   const enabledSources = marketSources.filter((s) => s.enabled).length;
   const healthySources = marketSources.filter(
-    (s) => s.enabled && s.cachedIndex && !s.lastError
+    (s) => s.enabled && s.cachedList && !s.lastError
   ).length;
 
   // ---- 远程插件安装 ----
-  const handleInstall = async (sourceId: string, entry: MarketPluginEntry) => {
-    setInstalling(`${sourceId}::${entry.id}`);
+  const handleInstall = async (item: RemoteItem) => {
+    setInstalling(item.key);
     try {
-      const result = await installRemotePlugin(entry);
-      message.success(`已安装 ${entry.name} → ${result.pluginDir}`);
+      const result = await installRemotePlugin(item.source, item.entry);
+      message.success(`已安装 ${item.entry.name} → ${result.pluginDir}`);
       await refreshExt();
     } catch (e) {
       message.error(`安装失败: ${String(e)}`);
@@ -357,7 +359,7 @@ export default function PluginMarket() {
                         type="primary"
                         icon={<CloudDownloadOutlined />}
                         loading={installing === t.key}
-                        onClick={() => handleInstall(t.sourceId, t.entry)}
+                        onClick={() => handleInstall(t)}
                       >
                         安装
                       </Button>
@@ -428,7 +430,7 @@ interface ManagerProps {
   onRemove: (id: string) => void;
   onToggle: (id: string) => void;
   onRename: (id: string, label: string) => void;
-  onCache: (id: string, index: import("../external/types").MarketIndex) => void;
+  onCache: (id: string, list: MarketList) => void;
   onError: (id: string, error: string) => void;
 }
 
@@ -467,7 +469,7 @@ function MarketSourceManager({
     const src = useUiStore.getState().marketSources.find((s) => s.id === id);
     if (src) {
       const r = await fetchMarketSource(src);
-      if (r.ok) onCache(id, r.index);
+      if (r.ok) onCache(id, r.list);
       else onError(id, r.error);
     }
     setRefreshing((m) => ({ ...m, [id]: false }));
@@ -478,8 +480,8 @@ function MarketSourceManager({
     setRefreshing((m) => ({ ...m, [src.id]: true }));
     const r = await fetchMarketSource(src);
     if (r.ok) {
-      onCache(src.id, r.index);
-      message.success(`${src.label ?? new URL(src.url).hostname} 拉取成功,${r.index.plugins.length} 个插件`);
+      onCache(src.id, r.list);
+      message.success(`${src.label ?? new URL(src.url).hostname} 拉取成功,${r.list.plugins.length} 个插件`);
     } else {
       onError(src.id, r.error);
       message.error(`拉取失败: ${r.error}`);
@@ -573,7 +575,7 @@ function MarketSourceManager({
               >
                 <List.Item.Meta
                   avatar={
-                    s.enabled && s.cachedIndex && !s.lastError ? (
+                    s.enabled && s.cachedList && !s.lastError ? (
                       <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 18 }} />
                     ) : s.lastError ? (
                       <CloseCircleOutlined style={{ color: "#ff4d4f", fontSize: 18 }} />
@@ -615,8 +617,8 @@ function MarketSourceManager({
                           />
                         </>
                       )}
-                      {s.cachedIndex && (
-                        <Tag color="cyan">{s.cachedIndex.plugins.length} 个插件</Tag>
+                      {s.cachedList && (
+                        <Tag color="cyan">{s.cachedList.plugins.length} 个插件</Tag>
                       )}
                       {!s.enabled && <Tag>已禁用</Tag>}
                     </Space>
@@ -631,9 +633,9 @@ function MarketSourceManager({
                           <ExclamationCircleOutlined /> {s.lastError}
                         </Typography.Text>
                       )}
-                      {s.cachedIndex?.description && (
+                      {s.cachedList?.description && (
                         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                          {s.cachedIndex.description}
+                          {s.cachedList.description}
                         </Typography.Text>
                       )}
                       {s.lastFetchAt && (

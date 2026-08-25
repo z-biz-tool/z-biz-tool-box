@@ -1,20 +1,24 @@
 /**
  * 远程市场源 — fetch + schema 校验。
  *
+ * 遵循 docs/market-spec.md v1.0:
+ *   客户端拿 base URL (B), GET {B}/list → MarketList
+ *
  * 流程:
  *   1. UI 调 addMarketSource(url) → 写入 zustand
  *   2. UI 调 fetchMarketSource(source) → 这里实现
- *      - 校验 url 协议(只接受 https / 本地 http)
- *      - 用 @tauri-apps/plugin-http 的 fetch(走 Rust, 绕开 CORS)
- *      - 解析 JSON + validateIndex 校验
- *      - 成功 → 写回 cachedIndex + 清空 lastError
- *      - 失败 → 写回 lastError, 保留旧 cachedIndex
- *   3. UI 展示 cachedIndex.plugins
- *   4. 用户点安装 → installer.installRemotePlugin(entry)
+ *      - 校验 base url 协议(只接受 https / 本地 http)
+ *      - 拼接 {B}/list, 用 @tauri-apps/plugin-http 的 fetch(走 Rust, 绕开 CORS)
+ *      - 解析 JSON + validateList 校验
+ *      - 成功 → 写回 cachedList + 清空 lastError
+ *      - 失败 → 写回 lastError, 保留旧 cachedList
+ *   3. UI 展示 cachedList.plugins
+ *   4. 用户点安装 → installer.installRemotePlugin(source, entry)
+ *      (installer 自己从 source.url + entry.id 拼下载 URL)
  */
 
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import type { MarketIndex, MarketPluginEntry, MarketSource } from "./types";
+import type { MarketList, MarketPluginEntry, MarketSource } from "./types";
 
 /** 拉取超时(ms) */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -31,7 +35,7 @@ export class MarketUrlError extends Error {
 }
 
 /**
- * 校验市场源 URL 是否可接受。
+ * 校验 base URL 是否可接受,并去掉末尾的 "/" 便于拼接。
  * - 必须 https://
  * - 例外: http://localhost / http://127.0.0.1 / http://[::1] (本地开发)
  * - 不能是 file:// / data: / blob: 等
@@ -45,15 +49,54 @@ export function validateMarketUrl(url: string): string {
   } catch {
     throw new MarketUrlError("不是合法的 URL");
   }
-  if (parsed.protocol === "https:") return parsed.toString();
+  if (parsed.protocol === "https:") {
+    return parsed.toString().replace(/\/+$/, "");
+  }
   if (parsed.protocol === "http:") {
     const host = parsed.hostname.toLowerCase();
     if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
-      return parsed.toString();
+      return parsed.toString().replace(/\/+$/, "");
     }
     throw new MarketUrlError("只接受 https:// 协议(本地 localhost 例外)");
   }
   throw new MarketUrlError(`不支持的协议: ${parsed.protocol}`);
+}
+
+// =====================================================================
+// URL 拼接工具
+// =====================================================================
+
+/**
+ * 把 base URL 和 path 拼成完整 URL。
+ *  - 绝对 path (以 / 开头): 替换 base 的 path
+ *  - 相对 path: 拼到 base path 后面
+ */
+export function joinUrl(base: string, path: string): string {
+  if (path.startsWith("/")) {
+    const b = new URL(base);
+    return `${b.protocol}//${b.host}${path}`;
+  }
+  return `${base.replace(/\/+$/, "")}/${path}`;
+}
+
+/** 标准端点: GET {base}/list */
+export function listUrl(base: string): string {
+  return joinUrl(base, "/list");
+}
+
+/** 标准端点: GET {base}/plugins/{id}/plugin.json */
+export function pluginJsonUrl(base: string, id: string): string {
+  return joinUrl(base, `/plugins/${encodeURIComponent(id)}/plugin.json`);
+}
+
+/** 标准端点: GET {base}/plugins/{id}/main.html */
+export function mainHtmlUrl(base: string, id: string): string {
+  return joinUrl(base, `/plugins/${encodeURIComponent(id)}/main.html`);
+}
+
+/** 标准端点: GET {base}/plugins/{id}/logo.png */
+export function logoUrl(base: string, id: string): string {
+  return joinUrl(base, `/plugins/${encodeURIComponent(id)}/logo.png`);
 }
 
 // =====================================================================
@@ -75,14 +118,8 @@ function isString(v: unknown): v is string {
   return typeof v === "string" && v.length > 0;
 }
 
-function isHttpsUrl(v: unknown): v is string {
-  if (typeof v !== "string" || !v) return false;
-  try {
-    const u = new URL(v);
-    return u.protocol === "https:" || u.protocol === "http:";
-  } catch {
-    return false;
-  }
+function isStringOrEmpty(v: unknown): v is string {
+  return typeof v === "string";
 }
 
 function validatePluginEntry(raw: unknown, idx: number): MarketPluginEntry {
@@ -106,41 +143,32 @@ function validatePluginEntry(raw: unknown, idx: number): MarketPluginEntry {
   if (!isString(version)) {
     throw new SchemaError(`plugins[${idx}].version 缺失或非字符串`);
   }
-  const pluginJson = raw.pluginJson;
-  if (!isHttpsUrl(pluginJson)) {
-    throw new SchemaError(
-      `plugins[${idx}].pluginJson 缺失或不是合法 http(s) URL`
-    );
-  }
-  const mainHtml = raw.mainHtml;
-  if (!isHttpsUrl(mainHtml)) {
-    throw new SchemaError(
-      `plugins[${idx}].mainHtml 缺失或不是合法 http(s) URL`
-    );
-  }
-  const description = isString(raw.description) ? raw.description : "";
+  const description = isStringOrEmpty(raw.description) ? raw.description : "";
   const author = isString(raw.author) ? raw.author : undefined;
-  const homepage = isHttpsUrl(raw.homepage) ? raw.homepage : undefined;
   const tags = Array.isArray(raw.tags)
     ? raw.tags.filter(isString)
     : undefined;
-  const logo = isHttpsUrl(raw.logo) ? raw.logo : undefined;
+  const size = typeof raw.size === "number" ? raw.size : undefined;
+  const updatedAt = isString(raw.updatedAt) ? raw.updatedAt : undefined;
+  const homepage =
+    typeof raw.homepage === "string" && raw.homepage
+      ? raw.homepage
+      : undefined;
 
   return {
     id,
     name,
     version,
     description,
-    pluginJson,
-    mainHtml,
     author,
     homepage,
     tags,
-    logo,
+    size,
+    updatedAt,
   };
 }
 
-export function validateIndex(raw: unknown): MarketIndex {
+export function validateList(raw: unknown): MarketList {
   if (!isObject(raw)) {
     throw new SchemaError("响应不是 JSON 对象");
   }
@@ -174,7 +202,7 @@ export function validateIndex(raw: unknown): MarketIndex {
     schemaVersion: 1,
     name,
     description: isString(raw.description) ? raw.description : undefined,
-    homepage: isHttpsUrl(raw.homepage) ? raw.homepage : undefined,
+    homepage: isString(raw.homepage) ? raw.homepage : undefined,
     updatedAt: isString(raw.updatedAt) ? raw.updatedAt : undefined,
     plugins,
   };
@@ -186,7 +214,7 @@ export function validateIndex(raw: unknown): MarketIndex {
 
 export interface FetchOk {
   ok: true;
-  index: MarketIndex;
+  list: MarketList;
 }
 export interface FetchErr {
   ok: false;
@@ -196,19 +224,20 @@ export type FetchResult = FetchOk | FetchErr;
 
 /**
  * 拉取并校验单个市场源。
- * 永远不抛异常 — 返回 { ok, index | error } 便于 UI 直接展示。
+ * 永远不抛异常 — 返回 { ok, list | error } 便于 UI 直接展示。
  */
 export async function fetchMarketSource(source: MarketSource): Promise<FetchResult> {
   try {
-    const safeUrl = validateMarketUrl(source.url);
-    const resp = await tauriFetch(safeUrl, {
+    const base = validateMarketUrl(source.url);
+    const url = listUrl(base);
+    const resp = await tauriFetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       // @ts-ignore — connectTimeout 是 tauri-plugin-http 的扩展字段
       connectTimeout: FETCH_TIMEOUT_MS,
     });
     if (!resp.ok) {
-      return { ok: false, error: `HTTP ${resp.status} ${resp.statusText}` };
+      return { ok: false, error: `HTTP ${resp.status} ${resp.statusText} @ ${url}` };
     }
     const text = await resp.text();
     let raw: unknown;
@@ -217,8 +246,8 @@ export async function fetchMarketSource(source: MarketSource): Promise<FetchResu
     } catch (e) {
       return { ok: false, error: `JSON 解析失败: ${String(e)}` };
     }
-    const index = validateIndex(raw);
-    return { ok: true, index };
+    const list = validateList(raw);
+    return { ok: true, list };
   } catch (e) {
     if (e instanceof MarketUrlError || e instanceof SchemaError) {
       return { ok: false, error: e.message };

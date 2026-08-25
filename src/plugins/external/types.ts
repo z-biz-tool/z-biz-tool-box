@@ -66,32 +66,25 @@ export interface ExternalPlugin extends ExternalPluginManifest {
 // =====================================================================
 
 /**
- * 市场源 URL 必须返回符合 MarketIndex 的 JSON。
- * 当前 schemaVersion = 1。
+ * 市场源遵循 docs/market-spec.md v1.0:
  *
- * 校验规则(被 market.ts validateIndex 实现):
- *   - top-level: { schemaVersion: 1, name: string, plugins: [...] }
- *   - 每个 plugin: { id, name, version, pluginJson, mainHtml }
- *     pluginJson: 远程 plugin.json 的 URL
- *     mainHtml:   远程 main.html 的 URL(会被下载到本地)
- *     logo:       远程 logo.png 的 URL(可选)
+ *   客户端只配置 base URL (B); 按下面规则拼接子路径:
+ *     GET {B}/list                              → MarketList (本类型)
+ *     GET {B}/plugins/{id}/plugin.json          → ExternalPluginManifest
+ *     GET {B}/plugins/{id}/main.html            → text/html
+ *     GET {B}/plugins/{id}/logo.png             → image/png (可选, 404 静默)
  *
- * 安装流程:
- *   1. fetch(downloadUrl) → downloadUrl 是 index.json 的 URL,返回 MarketIndex
- *   2. 用户点安装 → installer.fetchPluginFiles(plugin)
- *      - 下载 pluginJson URL → 写到本地 plugins/{id}/plugin.json
- *      - 下载 mainHtml URL  → 写到本地 plugins/{id}/main.html
- *      - 下载 logo URL     → 写到本地 plugins/{id}/logo.png
- *   3. 触发 scanner.refresh() → 跟本地插件同等待遇
+ *   MarketList 里只放元信息, 不带任何下载 URL — 客户端按 base 拼。
+ *   这样源迁移/换 CDN 时, 旧市场数据不会批量失效。
  */
 export interface MarketPluginEntry {
-  /** 插件 id,反向域名风格 */
+  /** 插件 id,反向域名风格, 匹配 [a-zA-Z0-9._-]+ */
   id: string;
   /** 显示名 */
   name: string;
-  /** 描述 */
+  /** 描述(必填, 可空字符串) */
   description: string;
-  /** 版本字符串,如 "1.0.0" */
+  /** 版本字符串 */
   version: string;
   /** 作者 */
   author?: string;
@@ -99,15 +92,13 @@ export interface MarketPluginEntry {
   homepage?: string;
   /** 标签 */
   tags?: string[];
-  /** 远程 plugin.json 的 URL */
-  pluginJson: string;
-  /** 远程 main.html 的 URL */
-  mainHtml: string;
-  /** 远程 logo.png 的 URL(可选) */
-  logo?: string;
+  /** 完整包字节数 */
+  size?: number;
+  /** ISO 8601 */
+  updatedAt?: string;
 }
 
-export interface MarketIndex {
+export interface MarketList {
   schemaVersion: 1;
   /** 市场显示名 */
   name: string;
@@ -124,13 +115,13 @@ export interface MarketIndex {
 /**
  * 用户配置的市场源 — 持久化在 zustand store。
  *
- * url 必须 https:// 开头(本地开发可放宽到 http://localhost / 127.0.0.1)。
- * cachedIndex 缓存最近一次成功拉取的索引,失败时不覆盖。
+ * url = base URL, 客户端 GET {url}/list
+ * cachedList 缓存最近一次成功拉取的列表,失败时不覆盖。
  */
 export interface MarketSource {
   /** 内部 id(uuid v4 短串) */
   id: string;
-  /** 市场源 URL — GET 这个 URL 应返回 MarketIndex JSON */
+  /** 市场 base URL — GET {url}/list 应返回 MarketList JSON */
   url: string;
   /** 用户给这个源起的别名(可空,默认显示 URL host) */
   label?: string;
@@ -140,6 +131,6 @@ export interface MarketSource {
   lastFetchAt?: number;
   /** 上次拉取错误信息(成功时清空) */
   lastError?: string;
-  /** 上次成功拉取缓存的 index,失败时保留 */
-  cachedIndex?: MarketIndex;
+  /** 上次成功拉取缓存的 list,失败时保留 */
+  cachedList?: MarketList;
 }

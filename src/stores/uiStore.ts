@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { MarketIndex, MarketSource } from "../plugins/external/types";
+import type { MarketList, MarketSource } from "../plugins/external/types";
 
 export type ThemeMode = "light" | "dark";
 
@@ -25,7 +25,7 @@ interface UiState {
   disabled: string[];
 
   /**
-   * 用户配置的远程市场源(URL 列表)。每个源可拉取一个 MarketIndex。
+   * 用户配置的远程市场源(base URL 列表)。每个源 GET {url}/list 得 MarketList。
    * 持久化在 localStorage,启用/禁用/增删改查都在这里。
    */
   marketSources: MarketSource[];
@@ -50,7 +50,7 @@ interface UiState {
   removeMarketSource: (id: string) => void;
   toggleMarketSource: (id: string) => void;
   renameMarketSource: (id: string, label: string) => void;
-  setMarketSourceCache: (id: string, index: MarketIndex) => void;
+  setMarketSourceCache: (id: string, list: MarketList) => void;
   setMarketSourceError: (id: string, error: string) => void;
 }
 
@@ -129,11 +129,11 @@ export const useUiStore = create<UiState>()(
             m.id === id ? { ...m, label: label.trim() || undefined } : m
           ),
         })),
-      setMarketSourceCache: (id, index) =>
+      setMarketSourceCache: (id, list) =>
         set((s) => ({
           marketSources: s.marketSources.map((m) =>
             m.id === id
-              ? { ...m, cachedIndex: index, lastFetchAt: Date.now(), lastError: undefined }
+              ? { ...m, cachedList: list, lastFetchAt: Date.now(), lastError: undefined }
               : m
           ),
         })),
