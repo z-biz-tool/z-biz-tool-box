@@ -624,22 +624,64 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             <div style={{ padding: "16px 24px 32px" }}>
               {/* 第一段: 已装的 external 插件 (从 extPlugins) */}
               {extPlugins.filter(p => !p.error).length > 0 && (
-                <div style={{ marginBottom: 28 }}>
+                <div
+                  style={{
+                    marginBottom: 20,
+                    background: "var(--ant-color-bg-container)",
+                    border: "1px solid var(--ant-color-border-secondary)",
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      marginBottom: 12,
-                      paddingBottom: 8,
-                      borderBottom: "1px solid var(--ant-color-border-secondary)",
+                      gap: 10,
+                      marginBottom: 14,
                     }}
                   >
-                    <AppstoreOutlined style={{ color: "#722ed1" }} />
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>已装的市场插件</div>
-                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                      ({extPlugins.filter(p => !p.error).length})
-                    </Typography.Text>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: "rgba(114,46,209,0.12)",
+                        color: "#722ed1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <AppstoreOutlined />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>
+                        已安装的市场插件
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--ant-color-text-tertiary)",
+                        }}
+                      >
+                        本地已装, 可直接打开
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: "#722ed1",
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "2px 10px",
+                        borderRadius: 10,
+                      }}
+                    >
+                      {extPlugins.filter(p => !p.error).length}
+                    </div>
                   </div>
                   <div
                     style={{
@@ -756,48 +798,78 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               ) : (
                 <div style={{ padding: "16px 24px 32px" }}>
                   {marketGroups.map((g) => (
-                <div key={g.source.id} style={{ marginBottom: 28 }}>
+                <div
+                  key={g.source.id}
+                  style={{
+                    marginBottom: 20,
+                    background: "var(--ant-color-bg-container)",
+                    border: `1px solid ${
+                      g.source.lastError ? "#ffccc7" : "var(--ant-color-border-secondary)"
+                    }`,
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
                   {/* 源 header */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 12,
-                      paddingBottom: 8,
-                      borderBottom: "1px solid var(--ant-color-border-secondary)",
+                      gap: 10,
+                      marginBottom: 14,
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <WifiOutlined
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: g.source.lastError
+                          ? "rgba(255,77,79,0.12)"
+                          : "rgba(22,119,255,0.12)",
+                        color: g.source.lastError ? "#ff4d4f" : "#1677ff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                      }}
+                    >
+                      <WifiOutlined />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>
+                        {g.source.label ?? g.source.cachedList?.name ?? "未命名源"}
+                      </div>
+                      <div
                         style={{
-                          color:
-                            g.source.lastError
-                              ? "#ff4d4f"
-                              : "var(--ant-color-primary)",
+                          fontSize: 11,
+                          color: "var(--ant-color-text-tertiary)",
+                          fontFamily: "var(--mono-font)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>
-                          {g.source.label ?? g.source.cachedList?.name ?? "未命名源"}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--ant-color-text-tertiary)",
-                            fontFamily: "var(--mono-font)",
-                          }}
-                        >
-                          {g.source.url}
-                        </div>
+                      >
+                        {g.source.url}
                       </div>
                     </div>
-                    <Badge
-                      count={g.plugins.length}
-                      showZero
-                      color={g.source.lastError ? "red" : "cyan"}
-                      title={g.source.lastError ?? `${g.plugins.length} 个可操作插件`}
-                    />
+                    <div
+                      style={{
+                        background: g.source.lastError ? "#ff4d4f" : "#1677ff",
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "2px 10px",
+                        borderRadius: 10,
+                        flexShrink: 0,
+                      }}
+                      title={
+                        g.source.lastError ??
+                        `${g.plugins.length} 个远程插件`
+                      }
+                    >
+                      {g.plugins.length}
+                    </div>
                   </div>
 
                   {/* 插件网格 */}
