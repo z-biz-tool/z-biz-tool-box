@@ -62,7 +62,8 @@ async function loadOnePlugin(
     const mainPath = await join(dirPath, mainFile);
     const logoPath = await join(dirPath, logoFile);
 
-    // convertFileSrc 把绝对路径 → tauri://localhost/... 同源 URL
+    // convertFileSrc 把绝对路径 → asset://localhost/... URL(与宿主跨源,
+    // 需 Cargo features 开 protocol-asset + tauri.conf.json 配 assetProtocol)
     const mainUrl = convertFileSrc(mainPath);
     let logoUrl: string | undefined;
     try {

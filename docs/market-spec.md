@@ -142,11 +142,11 @@
 ### 3.3 安装时文件落盘
 
 客户端把下载的 3 个文件写到本地:
-- `plugin.json` → `~/Library/Application Support/com.zifang.z-biz-tool-box/plugins/{id}/plugin.json`
+- `plugin.json` → `~/.z-biz-tools/plugins/{id}/plugin.json`
 - `main.html` (内容来自 `{B}/plugins/{id}/{main}`) → 同目录下的 `{main}` 文件
 - `logo.png` (内容来自 `{B}/plugins/{id}/{logo}`, 可选) → 同目录下的 `{logo}` 文件
 
-之后 scanner 跟本地插件一视同仁, 走 tauri:// 同源 iframe + 注入 `window.zBiz` API。
+之后 scanner 跟本地插件一视同仁, 经 asset:// 协议 iframe 加载 + 桥接注入 `window.zBiz` API (见 4.4)。
 
 ---
 
@@ -179,8 +179,19 @@
 ### 4.4 沙箱执行
 
 市场源提供的 `main.html` **不直接在 webview 主域执行**, 而是被加载到 `<iframe sandbox="allow-scripts allow-forms allow-same-origin allow-popups">`。
-主应用通过 `window.zBiz` 注入受限 API (剪贴板、HTTP 转发、KV 存储、窗口控制、日志)。
-详见 `src/plugins/external/api.ts`。
+
+iframe 经 Tauri asset 协议 (`asset://localhost/<路径>`) 加载本地落盘文件, **与宿主跨源**, 宿主无法直接改写 `iframe.contentWindow`。受限 API (剪贴板、HTTP 转发、KV 存储、窗口控制、日志) 通过 **postMessage 桥接**注入 (宿主实现见 `src/plugins/external/PluginIframe.tsx` / `api.ts`):
+
+| 方向       | 消息                                      | 说明                                          |
+| ---------- | ----------------------------------------- | --------------------------------------------- |
+| 插件 → 宿主 | `{__zbiz_hello: 1}`                       | bootstrap 启动即发                            |
+| 宿主 → 插件 | `{__zbiz_ready: 1, pluginId}`             | 插件收到后安装 `window.zBiz`                  |
+| 插件 → 宿主 | `{__zbiz: 1, id, method, args}`           | method 如 `invoke` / `copyToClipboard` / `storage.get` |
+| 宿主 → 插件 | `{__zbiz_rsp: 1, id, result, error}`      | 与请求 id 配对, error 为字符串                |
+
+**插件 main.html 需内置上述 bootstrap** (安装 `window.zBiz`, 方法签名同 `api.ts` 的 `ZBizApi`, 单次调用超时 10s)。浏览器直开时无宿主应答, `window.zBiz` 保持 undefined, 插件应自行兜底 (原生 fetch / clipboard / localStorage)。
+
+> 宿主侧前置条件: `src-tauri/Cargo.toml` 开 `protocol-asset` feature, 且 `tauri.conf.json` 的 `app.security.assetProtocol` 配置 `enable: true` + `scope: ["$HOME/.z-biz-tools/**"]`。
 
 ---
 
