@@ -240,6 +240,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                         e?.stopPropagation();
                         try {
                           await uninstallLocalPlugin(it.pluginId!);
+                          // 卸载后强制刷新外部插件 store, 让左列 + 右列 + market view 全部更新
+                          await extRefresh();
                           message.success(`已卸载 ${it.name}`);
                         } catch (err) {
                           message.error(`卸载失败: ${String(err)}`);
@@ -1416,7 +1418,9 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                               style={{
                                 display: "block",
                                 width: "100%",
+                                minHeight: 32,
                                 padding: "6px 0",
+                                boxSizing: "border-box",
                                 background:
                                   installing === it.key
                                     ? "var(--ant-color-fill-secondary)"
@@ -1424,13 +1428,13 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
                                     : it.installed
                                     ? "rgba(82, 196, 26, 0.12)"
-                                    : "var(--ant-color-primary)",
+                                    : "linear-gradient(135deg, #1677ff 0%, #0958d9 100%)",
                                 color:
                                   installing === it.key
                                     ? "var(--ant-color-text-tertiary)"
                                     : it.installed && !it.isUpdate
                                     ? "#52c41a"
-                                    : "white",
+                                    : "#ffffff",
                                 border: it.installed && !it.isUpdate
                                   ? "1px solid rgba(82, 196, 26, 0.32)"
                                   : 0,
@@ -1443,21 +1447,28 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     : "pointer",
                                 fontSize: 13,
                                 fontWeight: 600,
+                                fontFamily:
+                                  "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                lineHeight: "20px",
+                                textAlign: "center",
+                                letterSpacing: 0.3,
                                 boxShadow: installing
                                   ? "none"
                                   : it.installed && !it.isUpdate
                                   ? "none"
-                                  : "0 2px 6px -1px rgba(0,0,0,0.15)",
+                                  : "0 2px 6px -1px rgba(0,0,0,0.18)",
                                 transition: "all 0.16s",
                               }}
                             >
-                              {installing === it.key
-                                ? "处理中..."
-                                : it.isUpdate
-                                ? "更新"
-                                : it.installed
-                                ? "✓ 已装"
-                                : "安装"}
+                              <span style={{ display: "inline-block" }}>
+                                {installing === it.key
+                                  ? "处理中..."
+                                  : it.isUpdate
+                                  ? "更新"
+                                  : it.installed
+                                  ? "✓ 已装"
+                                  : "安装"}
+                              </span>
                             </button>
                           </div>
                         </div>
