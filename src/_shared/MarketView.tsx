@@ -185,6 +185,97 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
     );
   }, [installed, query]);
 
+  // 左栏分组: 内置工具在前, 外部插件在后 — 小节标题 + 分隔线增强区块隔离
+  const builtinInstalled = filteredInstalled.filter((it) => !it.isExternal).slice(0, 50);
+  const extInstalled = filteredInstalled.filter((it) => it.isExternal).slice(0, 50);
+  const renderInstalledItem = (it: (typeof installed)[number]) => (
+                <div
+                  key={it.key}
+                  data-no-drag
+                  onClick={() => onSelectTool(it.key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 10px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    color: "var(--ant-color-text)",
+                    cursor: "pointer",
+                    transition: "background 0.12s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "var(--ant-color-fill-tertiary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }}
+                >
+                  <span style={{ display: "inline-flex", width: 14, color: "var(--ant-color-text-tertiary)" }}>
+                    {it.icon}
+                  </span>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {it.name}
+                  </span>
+                  {it.isExternal && (
+                    <span style={{ fontSize: 10, color: "#722ed1" }}>📦</span>
+                  )}
+                  {it.isExternal && it.pluginId && (
+                    <Popconfirm
+                      title="卸载该外部插件?"
+                      description="会从 ~/.z-biz-tools/plugins/ 物理删除"
+                      okText="卸载"
+                      cancelText="取消"
+                      okType="danger"
+                      onConfirm={async (e) => {
+                        e?.stopPropagation();
+                        try {
+                          await uninstallLocalPlugin(it.pluginId!);
+                          message.success(`已卸载 ${it.name}`);
+                        } catch (err) {
+                          message.error(`卸载失败: ${String(err)}`);
+                        }
+                      }}
+                      onCancel={(e) => e?.stopPropagation()}
+                    >
+                      <button
+                        data-no-drag
+                        title="卸载"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          background: "transparent",
+                          border: 0,
+                          color: "var(--ant-color-text-tertiary)",
+                          cursor: "pointer",
+                          padding: "0 4px",
+                          fontSize: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          borderRadius: 3,
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.color = "#ff4d4f";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--ant-color-text-tertiary)";
+                        }}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </Popconfirm>
+                  )}
+                </div>
+  );
+
   return (
     <div
       style={{
@@ -340,7 +431,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           style={{
             width: 200,
             borderRight: "1px solid var(--ant-color-border-secondary)",
-            padding: "12px 8px",
+            boxShadow: "1px 0 4px rgba(0,0,0,0.03)",
+            padding: "12px 10px",
             overflowY: "auto",
             background: "var(--ant-color-bg-container)",
           }}
@@ -350,10 +442,12 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "4px 12px 8px",
+              padding: "2px 10px 10px",
               fontSize: 12,
               color: "var(--ant-color-text)",
-              fontWeight: 500,
+              fontWeight: 600,
+              borderBottom: "1px solid var(--ant-color-border-secondary)",
+              marginBottom: 8,
             }}
           >
             <span>已安装插件应用 ({installed.length})</span>
@@ -388,94 +482,37 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               <span>{query ? "无匹配插件" : "尚未安装任何插件应用"}</span>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {filteredInstalled.slice(0, 50).map((it) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {builtinInstalled.length > 0 && (
                 <div
-                  key={it.key}
-                  data-no-drag
-                  onClick={() => onSelectTool(it.key)}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 10px",
-                    borderRadius: 6,
-                    fontSize: 12,
-                    color: "var(--ant-color-text)",
-                    cursor: "pointer",
-                    transition: "background 0.12s",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "var(--ant-color-fill-tertiary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: 0.2,
+                    color: "var(--ant-color-text-tertiary)",
+                    padding: "6px 10px 2px",
                   }}
                 >
-                  <span style={{ display: "inline-flex", width: 14, color: "var(--ant-color-text-tertiary)" }}>
-                    {it.icon}
-                  </span>
-                  <span
-                    style={{
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {it.name}
-                  </span>
-                  {it.isExternal && (
-                    <span style={{ fontSize: 10, color: "#722ed1" }}>📦</span>
-                  )}
-                  {it.isExternal && it.pluginId && (
-                    <Popconfirm
-                      title="卸载该外部插件?"
-                      description="会从 ~/.z-biz-tools/plugins/ 物理删除"
-                      okText="卸载"
-                      cancelText="取消"
-                      okType="danger"
-                      onConfirm={async (e) => {
-                        e?.stopPropagation();
-                        try {
-                          await uninstallLocalPlugin(it.pluginId!);
-                          message.success(`已卸载 ${it.name}`);
-                        } catch (err) {
-                          message.error(`卸载失败: ${String(err)}`);
-                        }
-                      }}
-                      onCancel={(e) => e?.stopPropagation()}
-                    >
-                      <button
-                        data-no-drag
-                        title="卸载"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          background: "transparent",
-                          border: 0,
-                          color: "var(--ant-color-text-tertiary)",
-                          cursor: "pointer",
-                          padding: "0 4px",
-                          fontSize: 12,
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: 3,
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.color = "#ff4d4f";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLElement).style.color =
-                            "var(--ant-color-text-tertiary)";
-                        }}
-                      >
-                        <DeleteOutlined />
-                      </button>
-                    </Popconfirm>
-                  )}
+                  内置 ({builtinInstalled.length})
                 </div>
-              ))}
+              )}
+              {builtinInstalled.map(renderInstalledItem)}
+              {extInstalled.length > 0 && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: 0.2,
+                    color: "var(--ant-color-text-tertiary)",
+                    padding: "10px 10px 2px",
+                    marginTop: 6,
+                    borderTop: "1px solid var(--ant-color-border-secondary)",
+                  }}
+                >
+                  外部插件 ({extInstalled.length})
+                </div>
+              )}
+              {extInstalled.map(renderInstalledItem)}
             </div>
           )}
         </div>
@@ -486,12 +523,16 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           <div
             data-no-drag
             style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 10,
               padding: "12px 24px 8px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               gap: 12,
               borderBottom: "1px solid var(--ant-color-border-secondary)",
+              background: "var(--ant-color-bg-layout)",
             }}
           >
             <div style={{ display: "flex", gap: 4 }}>
@@ -543,17 +584,19 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             </div>
           ) : rightTab === "builtin" ? (
             // 内置 tab — 按 TOOL_GROUPS 展示 builtin 工具
-            <div style={{ padding: "16px 24px 32px" }}>
+            <div style={{ padding: "20px 24px 32px" }}>
               {TOOL_GROUPS.map((g) => {
                 const groupTools = g.tools.filter((t) => !disabled.includes(t.key));
                 if (groupTools.length === 0) return null;
                 return (
-                  <div key={g.key} style={{ marginBottom: 24 }}>
+                  <div key={g.key} style={{ marginBottom: 28 }}>
                     <div
                       style={{
                         fontSize: 13,
                         fontWeight: 600,
-                        marginBottom: 10,
+                        paddingBottom: 8,
+                        borderBottom: "1px solid var(--ant-color-border-secondary)",
+                        marginBottom: 12,
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
@@ -569,7 +612,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       style={{
                         display: "grid",
                         gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                        gap: 8,
+                        gap: 12,
                       }}
                     >
                       {groupTools.map((t) => (
@@ -581,7 +624,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                             background: "var(--ant-color-bg-container)",
                             border: "1px solid var(--ant-color-border-secondary)",
                             borderRadius: 8,
-                            padding: 10,
+                            padding: 12,
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
@@ -621,16 +665,16 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             </div>
           ) : (
             // 市场 tab: 已装的 ext 插件 + 按源分组的远程插件
-            <div style={{ padding: "16px 24px 32px" }}>
+            <div style={{ padding: "20px 24px 32px" }}>
               {/* 第一段: 已装的 external 插件 (从 extPlugins) */}
               {extPlugins.filter(p => !p.error).length > 0 && (
                 <div
                   style={{
-                    marginBottom: 20,
+                    marginBottom: 24,
                     background: "var(--ant-color-bg-container)",
                     border: "1px solid var(--ant-color-border-secondary)",
                     borderRadius: 12,
-                    padding: 16,
+                    padding: "16px 16px 20px",
                   }}
                 >
                   <div
@@ -638,6 +682,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      paddingBottom: 12,
+                      borderBottom: "1px solid var(--ant-color-border-secondary)",
                       marginBottom: 14,
                     }}
                   >
@@ -687,7 +733,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                      gap: 8,
+                      gap: 12,
                     }}
                   >
                     {extPlugins.filter(p => !p.error).map((p) => (
@@ -699,7 +745,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                           background: "var(--ant-color-bg-container)",
                           border: "1px solid var(--ant-color-border-secondary)",
                           borderRadius: 8,
-                          padding: 10,
+                          padding: 12,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
@@ -796,18 +843,18 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                   </button>
                 </div>
               ) : (
-                <div style={{ padding: "16px 24px 32px" }}>
+                <div>
                   {marketGroups.map((g) => (
                 <div
                   key={g.source.id}
                   style={{
-                    marginBottom: 20,
+                    marginBottom: 24,
                     background: "var(--ant-color-bg-container)",
                     border: `1px solid ${
                       g.source.lastError ? "#ffccc7" : "var(--ant-color-border-secondary)"
                     }`,
                     borderRadius: 12,
-                    padding: 16,
+                    padding: "16px 16px 20px",
                   }}
                 >
                   {/* 源 header */}
@@ -816,6 +863,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      paddingBottom: 12,
+                      borderBottom: "1px solid var(--ant-color-border-secondary)",
                       marginBottom: 14,
                     }}
                   >
@@ -877,7 +926,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                      gap: 12,
+                      gap: 14,
                     }}
                   >
                     {g.plugins.map((it) => {
@@ -1164,6 +1213,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         style={{
           padding: "8px 16px",
           borderTop: "1px solid var(--ant-color-border-secondary)",
+          background: "var(--ant-color-bg-container)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
