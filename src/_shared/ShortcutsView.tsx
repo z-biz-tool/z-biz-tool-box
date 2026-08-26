@@ -42,6 +42,7 @@ export function ShortcutsView({ onBack }: ShortcutsViewProps) {
       }}
     >
       <div
+        data-tauri-drag-region="deep"
         style={{
           display: "flex",
           alignItems: "center",

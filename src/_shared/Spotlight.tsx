@@ -200,6 +200,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           ref={inputRef}
           size="middle"
           data-no-drag
+          data-tauri-drag-region="false"
           prefix={
             <SearchOutlined
               style={{

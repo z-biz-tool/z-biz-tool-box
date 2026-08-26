@@ -8,7 +8,11 @@
  *   - 高度 28px, 渐变背景(跟现有玻璃态统一)
  *   - 左侧 HolderOutlined icon(3 条横线, 经典 drag affordance)
  *   - 中间可选 children(如 Spotlight 标题、MarketView 标题)
- *   - 整条 -webkit-app-region: drag, 内部交互元素用 data-no-drag 排除
+ *   - 整条 data-tauri-drag-region="deep": 子树内非交互元素点击即可拖动
+ *     (tauri drag.js 自动排除 input/button/select 等交互元素; 需要整簇
+ *      禁拖的局部用 data-tauri-drag-region="false", 如搜索框)
+ *   - 前置: capabilities 需含 core:window:allow-start-dragging
+ *     (core:window:default 权限集不含它, 缺了 invoke 会被 ACL 拒掉)
  *   - hover/active 状态: 抓手指针 + 渐变更明显
  *
  * 用法:
@@ -42,7 +46,7 @@ export function DragHandle({
 }: DragHandleProps) {
   return (
     <div
-      data-tauri-drag-region
+      data-tauri-drag-region="deep"
       style={{
         height,
         flexShrink: 0,
@@ -81,7 +85,7 @@ export function DragHandle({
         />
       )}
       <div
-        data-tauri-drag-region
+        data-tauri-drag-region="deep"
         style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}
       >
         {children}

@@ -282,6 +282,7 @@ function Hint({ text }: { text: string }) {
 function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div
+      data-tauri-drag-region="deep"
       style={{
         display: "flex",
         alignItems: "center",
