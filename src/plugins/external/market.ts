@@ -155,6 +155,16 @@ function isStringOrEmpty(v: unknown): v is string {
   return typeof v === "string";
 }
 
+function isHttpsUrl(v: unknown): v is string {
+  if (typeof v !== "string" || !v) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function validatePluginEntry(raw: unknown, idx: number): MarketPluginEntry {
   if (!isObject(raw)) {
     throw new SchemaError(`plugins[${idx}] 必须是对象`);
@@ -187,6 +197,9 @@ function validatePluginEntry(raw: unknown, idx: number): MarketPluginEntry {
     typeof raw.homepage === "string" && raw.homepage
       ? raw.homepage
       : undefined;
+  // icon URL — 可选, 必须 http(s) 才接受(避免 data: blob: 等被滥用)
+  const icon =
+    typeof raw.icon === "string" && isHttpsUrl(raw.icon) ? raw.icon : undefined;
 
   return {
     id,
@@ -198,6 +211,7 @@ function validatePluginEntry(raw: unknown, idx: number): MarketPluginEntry {
     tags,
     size,
     updatedAt,
+    icon,
   };
 }
 

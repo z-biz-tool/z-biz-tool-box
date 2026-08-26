@@ -96,6 +96,13 @@ export interface MarketPluginEntry {
   size?: number;
   /** ISO 8601 */
   updatedAt?: string;
+  /**
+   * 远程 icon URL(http(s))。客户端直接 `<img src={icon} />` 加载。
+   * - 有: 卡片 banner 显示图片
+   * - 无 / 加载失败: fallback 到首字母 + 渐变
+   * 尺寸建议 128x128 PNG/SVG, 卡片显示 64px
+   */
+  icon?: string;
 }
 
 export interface MarketList {

@@ -43,7 +43,8 @@
       "homepage": "https://github.com/z-biz/color-picker",
       "tags": ["color", "ui", "design"],
       "size": 12453,
-      "updatedAt": "2026-08-20T00:00:00Z"
+      "updatedAt": "2026-08-20T00:00:00Z",
+      "icon": "https://cdn.example.com/icons/color-picker.png"
     },
     {
       "id": "com.zifang.regex-tester",
@@ -81,6 +82,7 @@
 | `tags`        | string[]   | ❌   | 标签, 用于搜索/筛选                                   |
 | `size`        | int        | ❌   | 完整包字节数, 客户端可显示                            |
 | `updatedAt`   | string     | ❌   | ISO 8601                                              |
+| `icon`        | string     | ❌   | 远程 icon URL(http/https), 客户端用 `<img src>` 直加载; 加载失败 fallback 到首字母 + 渐变 |
 
 > **重要**: `MarketList` 里**不包含**任何下载 URL。客户端按 §1 的规则从 `B` 自动拼接。
 > 这避免了"市场数据里写死 URL, 源迁移时全部失效"的问题。

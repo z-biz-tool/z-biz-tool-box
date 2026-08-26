@@ -148,6 +148,16 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
     }
   };
 
+  // 跟踪加载失败的 icon — 失败的 fallback 到首字母 + 渐变
+  const [iconErrors, setIconErrors] = useState<Set<string>>(new Set());
+  const markIconError = (key: string) =>
+    setIconErrors((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+
   const filteredInstalled = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return installed;
@@ -541,7 +551,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                             el.style.borderColor = "var(--ant-color-border-secondary)";
                           }}
                         >
-                          {/* 顶部渐变 banner */}
+                          {/* 顶部 banner: 有 icon 用图片, 没有/失败 用首字母 + 渐变 */}
                           <div
                             style={{
                               height: 64,
@@ -567,18 +577,36 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                                 pointerEvents: "none",
                               }}
                             />
-                            <span
-                              style={{
-                                fontSize: 32,
-                                fontWeight: 700,
-                                opacity: 0.95,
-                                letterSpacing: 1,
-                                textShadow: "0 1px 2px rgba(0,0,0,0.15)",
-                                position: "relative",
-                              }}
-                            >
-                              {initial}
-                            </span>
+                            {it.entry.icon && !iconErrors.has(it.key) ? (
+                              <img
+                                src={it.entry.icon}
+                                alt={it.entry.name}
+                                title={it.entry.name}
+                                onError={() => markIconError(it.key)}
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  objectFit: "cover",
+                                  borderRadius: 8,
+                                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                  background: "rgba(255,255,255,0.15)",
+                                  position: "relative",
+                                }}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 32,
+                                  fontWeight: 700,
+                                  opacity: 0.95,
+                                  letterSpacing: 1,
+                                  textShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                  position: "relative",
+                                }}
+                              >
+                                {initial}
+                              </span>
+                            )}
                             {it.isUpdate ? (
                               <span
                                 style={{
