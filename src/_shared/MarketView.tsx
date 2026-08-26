@@ -494,45 +494,140 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                      gap: 10,
+                      gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                      gap: 12,
                     }}
                   >
-                    {g.plugins.map((it) => (
-                      <div
-                        key={it.key}
-                        style={{
-                          background: "var(--ant-color-bg-container)",
-                          border: "1px solid var(--ant-color-border-secondary)",
-                          borderRadius: 8,
-                          padding: 12,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                          transition: "all 0.16s",
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.borderColor =
-                            "var(--ant-color-primary)";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLElement).style.borderColor =
-                            "var(--ant-color-border-secondary)";
-                        }}
-                      >
+                    {g.plugins.map((it) => {
+                      // 按 id 哈希到 6 种渐变之一,让多个卡片颜色有差异
+                      const palettes = [
+                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                        "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+                        "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+                        "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+                        "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
+                      ];
+                      const hash = it.entry.id
+                        .split("")
+                        .reduce((a, c) => a + c.charCodeAt(0), 0);
+                      const bg = palettes[hash % palettes.length];
+                      const initial = it.entry.name.charAt(0).toUpperCase();
+                      return (
                         <div
+                          key={it.key}
                           style={{
+                            background: "var(--ant-color-bg-container)",
+                            border: "1px solid var(--ant-color-border-secondary)",
+                            borderRadius: 12,
+                            overflow: "hidden",
                             display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                            gap: 8,
+                            flexDirection: "column",
+                            transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+                            cursor: "default",
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                          }}
+                          onMouseEnter={(e) => {
+                            const el = e.currentTarget as HTMLElement;
+                            el.style.transform = "translateY(-2px)";
+                            el.style.boxShadow =
+                              "0 8px 24px -4px rgba(0,0,0,0.12), 0 0 0 1px var(--ant-color-primary)";
+                            el.style.borderColor = "var(--ant-color-primary)";
+                          }}
+                          onMouseLeave={(e) => {
+                            const el = e.currentTarget as HTMLElement;
+                            el.style.transform = "translateY(0)";
+                            el.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)";
+                            el.style.borderColor = "var(--ant-color-border-secondary)";
                           }}
                         >
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* 顶部渐变 banner */}
+                          <div
+                            style={{
+                              height: 64,
+                              background: bg,
+                              position: "relative",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "0 14px",
+                              color: "white",
+                            }}
+                          >
                             <div
                               style={{
-                                fontSize: 13,
+                                position: "absolute",
+                                right: -30,
+                                top: -30,
+                                width: 100,
+                                height: 100,
+                                borderRadius: "50%",
+                                background:
+                                  "radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%)",
+                                pointerEvents: "none",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: 32,
+                                fontWeight: 700,
+                                opacity: 0.95,
+                                letterSpacing: 1,
+                                textShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                position: "relative",
+                              }}
+                            >
+                              {initial}
+                            </span>
+                            {it.isUpdate ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 10,
+                                  background: "rgba(255,255,255,0.95)",
+                                  color: "#fa8c16",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                  position: "relative",
+                                }}
+                              >
+                                有更新
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 10,
+                                  background: "rgba(255,255,255,0.18)",
+                                  color: "white",
+                                  fontWeight: 500,
+                                  whiteSpace: "nowrap",
+                                  position: "relative",
+                                  backdropFilter: "blur(8px)",
+                                }}
+                              >
+                                未装
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 主体内容 */}
+                          <div
+                            style={{
+                              padding: 12,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                              flex: 1,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 14,
                                 fontWeight: 600,
+                                color: "var(--ant-color-text)",
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -545,96 +640,88 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                               style={{
                                 fontSize: 11,
                                 color: "var(--ant-color-text-tertiary)",
-                                marginTop: 2,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
                               }}
                             >
-                              {it.entry.author ?? "未知作者"}
+                              <span style={{ opacity: 0.7 }}>by</span>
+                              <span>{it.entry.author ?? "未知作者"}</span>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "var(--ant-color-text-secondary)",
+                                lineHeight: 1.5,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                minHeight: 36,
+                              }}
+                              title={it.entry.description}
+                            >
+                              {it.entry.description || "—"}
                             </div>
                           </div>
-                          {it.isUpdate ? (
+
+                          {/* 底部 footer */}
+                          <div
+                            style={{
+                              padding: "8px 12px",
+                              borderTop: "1px solid var(--ant-color-border-secondary)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              background: "var(--ant-color-bg-layout)",
+                            }}
+                          >
                             <span
                               style={{
                                 fontSize: 10,
-                                padding: "1px 6px",
-                                borderRadius: 4,
-                                background: "rgba(250, 173, 20, 0.12)",
-                                color: "#fa8c16",
-                                fontWeight: 600,
-                                whiteSpace: "nowrap",
+                                fontFamily: "var(--mono-font)",
+                                color: "var(--ant-color-text-tertiary)",
+                              }}
+                              title={`插件 id: ${it.entry.id}`}
+                            >
+                              v
+                              {it.isUpdate
+                                ? `${it.localVersion} → ${it.entry.version}`
+                                : it.entry.version}
+                            </span>
+                            <button
+                              disabled={installing === it.key}
+                              onClick={() => handleInstall(g.source, it.entry, it.key)}
+                              style={{
+                                padding: "4px 14px",
+                                background:
+                                  installing === it.key
+                                    ? "var(--ant-color-fill-secondary)"
+                                    : it.isUpdate
+                                    ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+                                    : "var(--ant-color-primary)",
+                                color: "white",
+                                border: 0,
+                                borderRadius: 6,
+                                cursor: installing === it.key ? "wait" : "pointer",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                boxShadow: installing
+                                  ? "none"
+                                  : "0 2px 6px -1px rgba(0,0,0,0.15)",
+                                transition: "all 0.16s",
                               }}
                             >
-                              有更新
-                            </span>
-                          ) : null}
+                              {installing === it.key
+                                ? "处理中..."
+                                : it.isUpdate
+                                ? "更新"
+                                : "安装"}
+                            </button>
+                          </div>
                         </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--ant-color-text-secondary)",
-                            lineHeight: 1.4,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                            minHeight: 30,
-                          }}
-                          title={it.entry.description}
-                        >
-                          {it.entry.description || "—"}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginTop: "auto",
-                            paddingTop: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontFamily: "var(--mono-font)",
-                              color: "var(--ant-color-text-tertiary)",
-                            }}
-                            title={`插件 id: ${it.entry.id}`}
-                          >
-                            v
-                            {it.isUpdate
-                              ? `${it.localVersion} → ${it.entry.version}`
-                              : it.entry.version}
-                          </span>
-                          <button
-                            disabled={installing === it.key}
-                            onClick={() => handleInstall(g.source, it.entry, it.key)}
-                            style={{
-                              padding: "3px 10px",
-                              background:
-                                installing === it.key
-                                  ? "var(--ant-color-fill-secondary)"
-                                  : it.isUpdate
-                                  ? "var(--ant-color-primary)"
-                                  : "var(--ant-color-primary-bg)",
-                              color:
-                                it.isUpdate
-                                  ? "white"
-                                  : "var(--ant-color-primary)",
-                              border: 0,
-                              borderRadius: 4,
-                              cursor: installing === it.key ? "wait" : "pointer",
-                              fontSize: 11,
-                              fontWeight: 500,
-                            }}
-                          >
-                            {installing === it.key
-                              ? "..."
-                              : it.isUpdate
-                              ? "更新"
-                              : "安装"}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
