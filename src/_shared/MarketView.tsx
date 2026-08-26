@@ -587,34 +587,38 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             <div
               style={{
                 display: "flex",
-                gap: 2,
-                padding: 3,
-                background: "var(--ant-color-fill-tertiary)",
-                borderRadius: 8,
+                gap: 4,
+                padding: 4,
+                background: "var(--ant-color-fill-secondary)",
+                border: "1px solid var(--ant-color-border-secondary)",
+                borderRadius: 10,
+                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.04)",
               }}
             >
               <button
                 onClick={() => switchTab("builtin")}
                 style={{
-                  padding: "4px 14px",
-                  fontSize: 12,
+                  padding: "6px 16px",
+                  fontSize: 13,
                   display: "flex",
                   alignItems: "center",
-                  gap: 5,
+                  gap: 6,
                   background:
                     rightTab === "builtin"
-                      ? "var(--ant-color-bg-container)"
+                      ? "linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%)"
                       : "transparent",
                   color:
                     rightTab === "builtin"
                       ? "var(--ant-color-primary)"
-                      : "var(--ant-color-text-secondary)",
+                      : "var(--ant-color-text)",
                   boxShadow:
-                    rightTab === "builtin" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                    rightTab === "builtin"
+                      ? "0 1px 3px rgba(0,0,0,0.12), 0 0 0 1px var(--ant-color-primary) inset"
+                      : "none",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontWeight: rightTab === "builtin" ? 600 : 400,
+                  fontWeight: rightTab === "builtin" ? 600 : 500,
                   transition: "all 0.16s",
                 }}
               >
@@ -624,25 +628,27 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               <button
                 onClick={() => switchTab("market")}
                 style={{
-                  padding: "4px 14px",
-                  fontSize: 12,
+                  padding: "6px 16px",
+                  fontSize: 13,
                   display: "flex",
                   alignItems: "center",
-                  gap: 5,
+                  gap: 6,
                   background:
                     rightTab === "market"
-                      ? "var(--ant-color-bg-container)"
+                      ? "linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%)"
                       : "transparent",
                   color:
                     rightTab === "market"
                       ? "var(--ant-color-primary)"
-                      : "var(--ant-color-text-secondary)",
+                      : "var(--ant-color-text)",
                   boxShadow:
-                    rightTab === "market" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                    rightTab === "market"
+                      ? "0 1px 3px rgba(0,0,0,0.12), 0 0 0 1px var(--ant-color-primary) inset"
+                      : "none",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontWeight: rightTab === "market" ? 600 : 400,
+                  fontWeight: rightTab === "market" ? 600 : 500,
                   transition: "all 0.16s",
                 }}
               >
