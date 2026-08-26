@@ -17,6 +17,7 @@ import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
 import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir } from "../plugins/external/scanner";
 import { useUiStore } from "../stores/uiStore";
+import { DragHandle } from "./DragHandle";
 
 interface MarketViewProps {
   onClose: () => void;
@@ -187,18 +188,14 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
         background: "var(--ant-color-bg-container)",
       }}
     >
-      {/* 顶部: 搜索框 + 操作按钮 */}
-      <div
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--ant-color-border-secondary)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
+      {/* 顶部: 搜索框 + 操作按钮(整条可拖) */}
+      <DragHandle
+        right={null}
+        showGrip={true}
       >
         <button
           onClick={onBack}
+          data-no-drag
           style={{
             background: "transparent",
             border: 0,
@@ -216,7 +213,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
         <div style={{ flex: 1 }}>
           <Input
             ref={inputRef}
-            size="large"
+            size="middle"
+            data-no-drag
             prefix={
               <SearchOutlined style={{ fontSize: 16, color: "var(--ant-color-text-tertiary)" }} />
             }
@@ -224,10 +222,22 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             variant="borderless"
-            style={{ fontSize: 15, height: 36 }}
+            style={{ fontSize: 15, height: 32 }}
             allowClear
           />
         </div>
+      </DragHandle>
+      {/* 工具栏第二行(单独的 no-drag 区域),保持与原本相同的按钮组 */}
+      <div
+        data-no-drag
+        style={{
+          padding: "4px 12px 8px",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          borderBottom: "1px solid var(--ant-color-border-secondary)",
+        }}
+      >
         <button
           onClick={async () => {
             try {

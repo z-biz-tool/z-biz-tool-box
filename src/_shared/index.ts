@@ -7,3 +7,4 @@ export { Spotlight } from "./Spotlight";
 export { MarketView } from "./MarketView";
 export { PreferencesView } from "./PreferencesView";
 export { ShortcutsView } from "./ShortcutsView";
+export { DragHandle } from "./DragHandle";

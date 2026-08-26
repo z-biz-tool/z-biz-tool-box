@@ -19,6 +19,7 @@ import type { ToolMeta } from "../plugins/_types";
 import { useUiStore } from "../stores/uiStore";
 import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir } from "../plugins/external/scanner";
+import { DragHandle } from "./DragHandle";
 import {
   motion,
   size,
@@ -193,20 +194,12 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
         color: "var(--ant-color-text)",
       }}
     >
-      {/* 顶栏: 渐变 + 玻璃模糊 */}
-      <div
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--ant-color-border-secondary)",
-          background:
-            "linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.02) 100%)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        }}
-      >
+      {/* 顶栏: 渐变 + 玻璃模糊 + 可拖动 */}
+      <DragHandle>
         <Input
           ref={inputRef}
-          size="large"
+          size="middle"
+          data-no-drag
           prefix={
             <SearchOutlined
               style={{
@@ -220,10 +213,10 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           variant="borderless"
-          style={{ fontSize: 15, height: 36, fontWeight: 500 }}
+          style={{ fontSize: 15, height: 32, fontWeight: 500 }}
           allowClear
         />
-      </div>
+      </DragHandle>
 
       {/* 主体: 三列 */}
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

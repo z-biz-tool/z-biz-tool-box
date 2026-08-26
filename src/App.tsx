@@ -209,8 +209,7 @@ export default function App() {
           }
         `}</style>
         <div className="zBizApp" style={{ display: "contents" }}>
-        {/* 顶栏拖动提示 — 4px 渐变线, hover 变明显, 在所有视图顶部统一显示 */}
-        <div className="zBizDragBar" title="拖动移动窗口" />
+        {/* 视图顶部由各 view 自行用 <DragHandle /> 提供可拖动区域 + 抓手 icon */}
         {active.kind === "spotlight" ? (
           <Spotlight
             onSelect={setActiveKey}
