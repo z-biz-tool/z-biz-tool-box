@@ -113,8 +113,9 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   );
 
   // 按源分组的远程插件列表
-  // - 跳过已装且同版的(不打扰)
+  // - 全部展示, 不跳过已装同版的(让用户看到当前状态)
   // - 未装的标 "未装" + "安装" 按钮
+  // - 已装同版的标 "已装" + 不显示按钮(占位)
   // - 已装但有更新的标 "有更新" + v_old → v_new + "更新" 按钮
   const marketGroups = useMemo(() => {
     const groups: Array<{
@@ -129,21 +130,18 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
     }> = [];
     for (const src of marketSources) {
       if (!src.enabled || !src.cachedList) continue;
-      const items = src.cachedList.plugins
-        .map((p) => {
-          const local = installedExtMap.get(p.id);
-          const localV = local?.version ?? "";
-          const isUpdate = Boolean(local && localV && isNewer(p.version, localV));
-          return {
-            key: `${src.id}::${p.id}`,
-            entry: p,
-            installed: !!local,
-            isUpdate,
-            localVersion: localV || undefined,
-          };
-        })
-        // 已装且无更新 → 跳过
-        .filter((it) => !it.installed || it.isUpdate);
+      const items = src.cachedList.plugins.map((p) => {
+        const local = installedExtMap.get(p.id);
+        const localV = local?.version ?? "";
+        const isUpdate = Boolean(local && localV && isNewer(p.version, localV));
+        return {
+          key: `${src.id}::${p.id}`,
+          entry: p,
+          installed: !!local,
+          isUpdate,
+          localVersion: localV || undefined,
+        };
+      });
       if (items.length > 0) {
         groups.push({ source: src, plugins: items });
       }
@@ -718,7 +716,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               )}
 
               {/* 第二段: 市场源 — 远程插件 (按源分组) */}
-              {marketGroups.length === 0 ? (
+              {marketSources.length === 0 ? (
                 // 没有任何源 — 引导
                 <div
                   style={{
@@ -924,6 +922,21 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                               >
                                 有更新
                               </span>
+                            ) : it.installed ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 10,
+                                  background: "rgba(82,196,26,0.95)",
+                                  color: "white",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                  position: "relative",
+                                }}
+                              >
+                                已装
+                              </span>
                             ) : (
                               <span
                                 style={{
@@ -1020,7 +1033,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                 : it.entry.version}
                             </span>
                             <button
-                              disabled={installing === it.key}
+                              disabled={installing === it.key || (it.installed && !it.isUpdate)}
                               onClick={() => handleInstall(g.source, it.entry, it.key)}
                               style={{
                                 padding: "4px 14px",
@@ -1029,11 +1042,21 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     ? "var(--ant-color-fill-secondary)"
                                     : it.isUpdate
                                     ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+                                    : it.installed
+                                    ? "var(--ant-color-bg-layout)"
                                     : "var(--ant-color-primary)",
-                                color: "white",
+                                color:
+                                  it.installed && !it.isUpdate
+                                    ? "var(--ant-color-text-tertiary)"
+                                    : "white",
                                 border: 0,
                                 borderRadius: 6,
-                                cursor: installing === it.key ? "wait" : "pointer",
+                                cursor:
+                                  installing === it.key
+                                    ? "wait"
+                                    : it.installed && !it.isUpdate
+                                    ? "not-allowed"
+                                    : "pointer",
                                 fontSize: 12,
                                 fontWeight: 500,
                                 boxShadow: installing
@@ -1046,6 +1069,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                 ? "处理中..."
                                 : it.isUpdate
                                 ? "更新"
+                                : it.installed
+                                ? "已装"
                                 : "安装"}
                             </button>
                           </div>
