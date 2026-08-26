@@ -3,6 +3,7 @@ import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView } from "./_shared";
+import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
@@ -29,6 +30,7 @@ function parseActiveKey(key: string):
 
 export default function App() {
   const [activeKey, setActiveKey] = useState<string>("spotlight");
+  const [sourceMgrOpen, setSourceMgrOpen] = useState(false);
   const pushRecent = useUiStore((s) => s.pushRecent);
   const extPlugins = useExtStore((s) => s.plugins);
 
@@ -216,11 +218,13 @@ export default function App() {
             onOpenMarket={() => setActiveKey("market")}
             onOpenPreferences={() => setActiveKey("preferences")}
             onOpenShortcuts={() => setActiveKey("shortcuts")}
+            onOpenMarketSources={() => setSourceMgrOpen(true)}
           />
         ) : active.kind === "market" ? (
           <MarketView
             onClose={hideWindow}
             onBack={() => setActiveKey("spotlight")}
+            onOpenMarketSources={() => setSourceMgrOpen(true)}
           />
         ) : active.kind === "preferences" ? (
           <PreferencesView onBack={() => setActiveKey("spotlight")} />
@@ -246,6 +250,11 @@ export default function App() {
         )}
         </div>
       </div>
+
+      <MarketSourceManager
+        open={sourceMgrOpen}
+        onClose={() => setSourceMgrOpen(false)}
+      />
     </ThemeProvider>
   );
 }

@@ -12,6 +12,7 @@ import {
   EnterOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
 import type { ToolMeta } from "../plugins/_types";
@@ -30,6 +31,7 @@ interface SpotlightProps {
   onOpenMarket: () => void;
   onOpenPreferences: () => void;
   onOpenShortcuts: () => void;
+  onOpenMarketSources: () => void;
 }
 
 type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
@@ -40,7 +42,7 @@ type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
  *  - 左/中列: 极简导航, 圆角 hover/active
  *  - 右列功能行: 渐变 active 背景 + scale 1.005 + 阴影 + cmds chip 渐变
  */
-export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts }: SpotlightProps) {
+export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts, onOpenMarketSources }: SpotlightProps) {
   const [query, setQuery] = useState("");
   const [activeNav, setActiveNav] = useState<NavKey>("all");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -50,6 +52,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
   const starred = useUiStore((s) => s.starred);
   const recent = useUiStore((s) => s.recent);
   const disabled = useUiStore((s) => s.disabled);
+  const sourcesCount = useUiStore((s) => s.marketSources.length);
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
@@ -297,6 +300,13 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
               icon={<KeyOutlined />}
               label="快捷键"
               onClick={onOpenShortcuts}
+            />
+            <NavItem
+              icon={<GlobalOutlined />}
+              label="市场源管理"
+              onClick={onOpenMarketSources}
+              badge={sourcesCount > 0 ? sourcesCount : undefined}
+              active={false}
             />
           </NavSection>
         </div>

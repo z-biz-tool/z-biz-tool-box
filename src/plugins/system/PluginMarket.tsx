@@ -15,10 +15,6 @@ import {
   Empty,
   Divider,
   message,
-  Modal,
-  List,
-  Alert,
-  Popconfirm,
 } from "antd";
 import {
   ReloadOutlined,
@@ -27,22 +23,18 @@ import {
   CodeOutlined,
   GlobalOutlined,
   ExclamationCircleOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-  EditOutlined,
   CloudDownloadOutlined,
   LinkOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   WifiOutlined,
 } from "@ant-design/icons";
 import { useUiStore } from "../../stores/uiStore";
 import { TOOL_GROUPS } from "../_registry";
 import { useExtStore } from "../external/store";
 import { openPluginsDir } from "../external/scanner";
-import { fetchMarketSource, isNewer, validateMarketUrl } from "../external/market";
+import { isNewer } from "../external/market";
 import { installRemotePlugin } from "../external/installer";
-import type { MarketList, MarketPluginEntry, MarketSource } from "../external/types";
+import type { MarketPluginEntry, MarketSource } from "../external/types";
+import { MarketSourceManager } from "../../_shared/MarketSourceManager";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -81,12 +73,6 @@ export default function PluginMarket() {
   const toggleDisabled = useUiStore((s) => s.toggleDisabled);
   const setDisabled = useUiStore((s) => s.setDisabled);
   const marketSources = useUiStore((s) => s.marketSources);
-  const addMarketSource = useUiStore((s) => s.addMarketSource);
-  const removeMarketSource = useUiStore((s) => s.removeMarketSource);
-  const toggleMarketSource = useUiStore((s) => s.toggleMarketSource);
-  const renameMarketSource = useUiStore((s) => s.renameMarketSource);
-  const setMarketSourceCache = useUiStore((s) => s.setMarketSourceCache);
-  const setMarketSourceError = useUiStore((s) => s.setMarketSourceError);
 
   const extPlugins = useExtStore((s) => s.plugins);
   const refreshExt = useExtStore((s) => s.refresh);
@@ -439,13 +425,6 @@ export default function PluginMarket() {
       <MarketSourceManager
         open={sourceMgrOpen}
         onClose={() => setSourceMgrOpen(false)}
-        sources={marketSources}
-        onAdd={addMarketSource}
-        onRemove={removeMarketSource}
-        onToggle={toggleMarketSource}
-        onRename={renameMarketSource}
-        onCache={setMarketSourceCache}
-        onError={setMarketSourceError}
       />
     </>
   );
@@ -455,241 +434,3 @@ export default function PluginMarket() {
 // 市场源管理 Modal
 // =====================================================================
 
-interface ManagerProps {
-  open: boolean;
-  onClose: () => void;
-  sources: MarketSource[];
-  onAdd: (url: string, label?: string) => string;
-  onRemove: (id: string) => void;
-  onToggle: (id: string) => void;
-  onRename: (id: string, label: string) => void;
-  onCache: (id: string, list: MarketList) => void;
-  onError: (id: string, error: string) => void;
-}
-
-function MarketSourceManager({
-  open,
-  onClose,
-  sources,
-  onAdd,
-  onRemove,
-  onToggle,
-  onRename,
-  onCache,
-  onError,
-}: ManagerProps) {
-  const [newUrl, setNewUrl] = useState("");
-  const [newLabel, setNewLabel] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [refreshing, setRefreshing] = useState<Record<string, boolean>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState("");
-
-  const handleAdd = async () => {
-    let safeUrl: string;
-    try {
-      safeUrl = validateMarketUrl(newUrl);
-    } catch (e) {
-      message.error(`URL 不合法: ${(e as Error).message}`);
-      return;
-    }
-    setAdding(true);
-    const id = onAdd(safeUrl, newLabel.trim() || undefined);
-    setNewUrl("");
-    setNewLabel("");
-    // 添加后立即拉一次
-    setRefreshing((m) => ({ ...m, [id]: true }));
-    const src = useUiStore.getState().marketSources.find((s) => s.id === id);
-    if (src) {
-      const r = await fetchMarketSource(src);
-      if (r.ok) onCache(id, r.list);
-      else onError(id, r.error);
-    }
-    setRefreshing((m) => ({ ...m, [id]: false }));
-    setAdding(false);
-  };
-
-  const handleRefresh = async (src: MarketSource) => {
-    setRefreshing((m) => ({ ...m, [src.id]: true }));
-    const r = await fetchMarketSource(src);
-    if (r.ok) {
-      onCache(src.id, r.list);
-      message.success(`${src.label ?? new URL(src.url).hostname} 拉取成功,${r.list.plugins.length} 个插件`);
-    } else {
-      onError(src.id, r.error);
-      message.error(`拉取失败: ${r.error}`);
-    }
-    setRefreshing((m) => ({ ...m, [src.id]: false }));
-  };
-
-  return (
-    <Modal
-      title="管理市场源"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={760}
-    >
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={
-          <span>
-            市场源是一个 HTTP(S) URL, GET 应当返回符合{" "}
-            <Typography.Text code>MarketIndex</Typography.Text> 规范的 JSON
-            (schemaVersion=1)。支持多个源并行,已连接的源里的插件可一键下载到本地。
-          </span>
-        }
-      />
-
-      <Card size="small" type="inner" title="添加市场源" style={{ marginBottom: 16 }}>
-        <Space.Compact style={{ width: "100%" }}>
-          <Input
-            placeholder="https://example.com/plugins/index.json"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            onPressEnter={handleAdd}
-            style={{ width: "55%" }}
-          />
-          <Input
-            placeholder="别名(可选)"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            onPressEnter={handleAdd}
-            style={{ width: "25%" }}
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            loading={adding}
-            disabled={!newUrl.trim()}
-            onClick={handleAdd}
-          >
-            添加并连接
-          </Button>
-        </Space.Compact>
-      </Card>
-
-      {sources.length === 0 ? (
-        <Empty description="还没有配置市场源" />
-      ) : (
-        <List
-          dataSource={sources}
-          renderItem={(s) => {
-            const editing = editingId === s.id;
-            return (
-              <List.Item
-                key={s.id}
-                actions={[
-                  <Tooltip key="refresh" title="重新拉取 index">
-                    <Button
-                      type="text"
-                      icon={<ReloadOutlined spin={refreshing[s.id]} />}
-                      loading={refreshing[s.id]}
-                      onClick={() => handleRefresh(s)}
-                    />
-                  </Tooltip>,
-                  <Switch
-                    key="toggle"
-                    size="small"
-                    checked={s.enabled}
-                    onChange={() => onToggle(s.id)}
-                  />,
-                  <Popconfirm
-                    key="del"
-                    title="删除这个市场源?"
-                    description="不会影响本地已安装的插件,只删除配置"
-                    onConfirm={() => onRemove(s.id)}
-                  >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>,
-                ]}
-              >
-                <List.Item.Meta
-                  avatar={
-                    s.enabled && s.cachedList && !s.lastError ? (
-                      <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 18 }} />
-                    ) : s.lastError ? (
-                      <CloseCircleOutlined style={{ color: "#ff4d4f", fontSize: 18 }} />
-                    ) : (
-                      <WifiOutlined style={{ color: "#bfbfbf", fontSize: 18 }} />
-                    )
-                  }
-                  title={
-                    <Space wrap>
-                      {editing ? (
-                        <Input
-                          size="small"
-                          value={editingLabel}
-                          autoFocus
-                          onChange={(e) => setEditingLabel(e.target.value)}
-                          onPressEnter={() => {
-                            onRename(s.id, editingLabel);
-                            setEditingId(null);
-                          }}
-                          onBlur={() => {
-                            onRename(s.id, editingLabel);
-                            setEditingId(null);
-                          }}
-                          style={{ width: 200 }}
-                        />
-                      ) : (
-                        <>
-                          <Typography.Text strong>
-                            {s.label ?? new URL(s.url).hostname}
-                          </Typography.Text>
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => {
-                              setEditingId(s.id);
-                              setEditingLabel(s.label ?? "");
-                            }}
-                          />
-                        </>
-                      )}
-                      {s.cachedList && (
-                        <Tag color="cyan">{s.cachedList.plugins.length} 个插件</Tag>
-                      )}
-                      {!s.enabled && <Tag>已禁用</Tag>}
-                    </Space>
-                  }
-                  description={
-                    <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }} copyable>
-                        {s.url}
-                      </Typography.Text>
-                      {s.lastError && (
-                        <Typography.Text type="danger" style={{ fontSize: 12 }}>
-                          <ExclamationCircleOutlined /> {s.lastError}
-                        </Typography.Text>
-                      )}
-                      {s.cachedList?.description && (
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                          {s.cachedList.description}
-                        </Typography.Text>
-                      )}
-                      {s.lastFetchAt && (
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                          上次拉取: {new Date(s.lastFetchAt).toLocaleString()}
-                        </Typography.Text>
-                      )}
-                    </Space>
-                  }
-                />
-              </List.Item>
-            );
-          }}
-        />
-      )}
-
-      <Divider style={{ margin: "16px 0 8px" }} />
-      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-        MarketIndex schemaVersion=1: 顶层含 name / plugins[], 每个 plugin 必须有 id / name / version / pluginJson / mainHtml。
-        安装时把 plugin.json + main.html 写到本地 <code>~/.../plugins/{`{id}`}/</code>。
-      </Typography.Text>
-    </Modal>
-  );
-}

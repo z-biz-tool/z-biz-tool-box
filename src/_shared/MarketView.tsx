@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "antd";
+import { Input, Badge } from "antd";
 import {
   SearchOutlined,
   ArrowLeftOutlined,
@@ -11,14 +11,17 @@ import {
   AppstoreOutlined,
   RocketOutlined,
   CheckCircleOutlined,
+  WifiOutlined,
 } from "@ant-design/icons";
 import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
 import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir } from "../plugins/external/scanner";
+import { useUiStore } from "../stores/uiStore";
 
 interface MarketViewProps {
   onClose: () => void;
   onBack: () => void;
+  onOpenMarketSources: () => void;
 }
 
 /**
@@ -32,12 +35,16 @@ interface MarketViewProps {
  *  - "已安装" = builtin tools + ext plugins
  *  - "精选" / "排行榜" = mock 推荐(没有后端推荐系统, 从 builtin 工具里挑)
  */
-export function MarketView({ onClose, onBack }: MarketViewProps) {
+export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<any>(null);
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
+  const marketSources = useUiStore((s) => s.marketSources);
+  const healthySources = marketSources.filter(
+    (s) => s.enabled && s.cachedList && !s.lastError
+  ).length;
 
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus?.(), 50);
@@ -238,6 +245,32 @@ export function MarketView({ onClose, onBack }: MarketViewProps) {
           title="打开插件目录"
         >
           <SettingOutlined />
+        </button>
+        <button
+          onClick={onOpenMarketSources}
+          style={{
+            background: marketSources.length === 0 ? "var(--ant-color-primary-bg)" : "transparent",
+            border: 0,
+            color: marketSources.length === 0 ? "var(--ant-color-primary)" : "var(--ant-color-text-tertiary)",
+            cursor: "pointer",
+            fontSize: 14,
+            padding: 6,
+            borderRadius: 4,
+          }}
+          title={
+            marketSources.length === 0
+              ? "添加市场源(填一个 https://... 拉取远程插件)"
+              : `管理市场源 (${healthySources}/${marketSources.length} 健康)`
+          }
+        >
+          <Badge
+            count={marketSources.length}
+            size="small"
+            offset={[-2, 2]}
+            color={marketSources.length === 0 ? "red" : healthySources === marketSources.length ? "#52c41a" : "#faad14"}
+          >
+            <WifiOutlined />
+          </Badge>
         </button>
         <button
           onClick={() => extRefresh()}
