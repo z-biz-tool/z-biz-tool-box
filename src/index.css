@@ -13,3 +13,14 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+/* MarketView 工具栏图标按钮 — 统一圆角与 hover 反馈
+   (按钮 inline style 带 background/color, hover 需 !important 才能覆盖) */
+.mvIconBtn {
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+.mvIconBtn:hover:not(:disabled) {
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
+}

@@ -9,6 +9,7 @@ import {
   CloseOutlined,
   ReloadOutlined,
   AppstoreOutlined,
+  ShopOutlined,
   RocketOutlined,
   CheckCircleOutlined,
   WifiOutlined,
@@ -319,7 +320,12 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             variant="borderless"
-            style={{ fontSize: 15, height: 32 }}
+            style={{
+              fontSize: 15,
+              height: 32,
+              background: "var(--ant-color-fill-tertiary)",
+              borderRadius: 8,
+            }}
             allowClear
           />
         </div>
@@ -336,6 +342,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         }}
       >
         <button
+          className="mvIconBtn"
           onClick={async () => {
             try {
               await openPluginsDir();
@@ -354,6 +361,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           <SettingOutlined />
         </button>
         <button
+          className="mvIconBtn"
           onClick={onOpenMarketSources}
           style={{
             background: marketSources.length === 0 ? "var(--ant-color-primary-bg)" : "transparent",
@@ -380,6 +388,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           </Badge>
         </button>
         <button
+          className="mvIconBtn"
           onClick={() => extRefresh()}
           disabled={extLoading}
           style={{
@@ -395,6 +404,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           {extLoading ? <SyncOutlined spin /> : <ReloadOutlined />}
         </button>
         <button
+          className="mvIconBtn"
           onClick={onClose}
           style={{
             background: "transparent",
@@ -409,6 +419,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           <PushpinOutlined />
         </button>
         <button
+          className="mvIconBtn"
           onClick={onClose}
           style={{
             background: "transparent",
@@ -451,7 +462,16 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             }}
           >
             <span>已安装插件应用 ({installed.length})</span>
-            <span style={{ color: "var(--ant-color-text-tertiary)" }}>···</span>
+            <span
+              style={{
+                color: "var(--ant-color-text-tertiary)",
+                fontSize: 10,
+                fontWeight: 400,
+              }}
+            >
+              {installed.filter((i) => !i.isExternal).length} 内置 ·{" "}
+              {installed.filter((i) => i.isExternal).length} 外部
+            </span>
           </div>
           {filteredInstalled.length === 0 ? (
             <div
@@ -562,36 +582,70 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               background: "var(--ant-color-bg-layout)",
             }}
           >
-            <div style={{ display: "flex", gap: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 2,
+                padding: 3,
+                background: "var(--ant-color-fill-tertiary)",
+                borderRadius: 8,
+              }}
+            >
               <button
                 onClick={() => switchTab("builtin")}
                 style={{
-                  padding: "4px 12px",
+                  padding: "4px 14px",
                   fontSize: 12,
-                  background: rightTab === "builtin" ? "var(--ant-color-primary)" : "transparent",
-                  color: rightTab === "builtin" ? "white" : "var(--ant-color-text)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background:
+                    rightTab === "builtin"
+                      ? "var(--ant-color-bg-container)"
+                      : "transparent",
+                  color:
+                    rightTab === "builtin"
+                      ? "var(--ant-color-primary)"
+                      : "var(--ant-color-text-secondary)",
+                  boxShadow:
+                    rightTab === "builtin" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontWeight: 500,
+                  fontWeight: rightTab === "builtin" ? 600 : 400,
+                  transition: "all 0.16s",
                 }}
               >
-                🏠 内置 ({TOOL_GROUPS.reduce((s, g) => s + g.tools.filter(t => !disabled.includes(t.key)).length, 0)})
+                <AppstoreOutlined />
+                内置 ({TOOL_GROUPS.reduce((s, g) => s + g.tools.filter(t => !disabled.includes(t.key)).length, 0)})
               </button>
               <button
                 onClick={() => switchTab("market")}
                 style={{
-                  padding: "4px 12px",
+                  padding: "4px 14px",
                   fontSize: 12,
-                  background: rightTab === "market" ? "var(--ant-color-primary)" : "transparent",
-                  color: rightTab === "market" ? "white" : "var(--ant-color-text)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background:
+                    rightTab === "market"
+                      ? "var(--ant-color-bg-container)"
+                      : "transparent",
+                  color:
+                    rightTab === "market"
+                      ? "var(--ant-color-primary)"
+                      : "var(--ant-color-text-secondary)",
+                  boxShadow:
+                    rightTab === "market" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontWeight: 500,
+                  fontWeight: rightTab === "market" ? 600 : 400,
+                  transition: "all 0.16s",
                 }}
               >
-                🛒 市场 ({extPlugins.filter(p => !p.error).length} /{" "}
+                <ShopOutlined />
+                市场 ({extPlugins.filter(p => !p.error).length} /{" "}
                 {marketGroups.reduce((s, g) => s + g.plugins.length, 0)})
               </button>
             </div>
@@ -604,10 +658,123 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           </div>
 
           {query ? (
-            <div style={{ padding: 24 }}>
-              <div style={{ marginBottom: 12, fontSize: 14, color: "var(--ant-color-text)" }}>
-                搜索 "{query}" 的已装插件 ({filteredInstalled.length})
+            // 搜索结果: 已装插件(内置+外部)网格
+            <div style={{ padding: "20px 24px 32px" }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>搜索 "{query}"</span>
+                <span style={{ color: "var(--ant-color-text-tertiary)", fontWeight: 400 }}>
+                  共 {filteredInstalled.length} 个结果
+                </span>
               </div>
+              {filteredInstalled.length === 0 ? (
+                <div
+                  style={{
+                    padding: "48px 0",
+                    textAlign: "center",
+                    color: "var(--ant-color-text-tertiary)",
+                    fontSize: 12,
+                  }}
+                >
+                  没有找到与 "{query}" 匹配的插件应用
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {filteredInstalled.slice(0, 100).map((it) => (
+                    <div
+                      key={it.key}
+                      data-no-drag
+                      onClick={() => onSelectTool(it.key)}
+                      style={{
+                        background: "var(--ant-color-bg-container)",
+                        border: "1px solid var(--ant-color-border-secondary)",
+                        borderRadius: 8,
+                        padding: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                        transition: "all 0.16s",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor =
+                          "var(--ant-color-primary)";
+                        (e.currentTarget as HTMLElement).style.boxShadow =
+                          "0 4px 12px rgba(0,0,0,0.08)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor =
+                          "var(--ant-color-border-secondary)";
+                        (e.currentTarget as HTMLElement).style.boxShadow =
+                          "0 1px 2px rgba(0,0,0,0.04)";
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          fontSize: 14,
+                          flexShrink: 0,
+                          color: it.isExternal ? "#722ed1" : "var(--ant-color-primary)",
+                          background: it.isExternal
+                            ? "rgba(114,46,209,0.08)"
+                            : "var(--ant-color-primary-bg)",
+                        }}
+                      >
+                        {it.icon}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 500,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {it.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--ant-color-text-tertiary)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {it.desc || (it.isExternal ? "外部插件" : "内置工具")}
+                        </div>
+                      </div>
+                      {it.isExternal && (
+                        <Tag color="purple" style={{ fontSize: 10, margin: 0, flexShrink: 0 }}>
+                          外部
+                        </Tag>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : rightTab === "builtin" ? (
             // 内置 tab — 按 TOOL_GROUPS 展示 builtin 工具
@@ -1308,8 +1475,18 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             display: "flex",
             alignItems: "center",
             gap: 8,
+            padding: "3px 8px",
+            borderRadius: 6,
             color: "var(--ant-color-text-tertiary)",
             cursor: "pointer",
+            transition: "background 0.12s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background =
+              "var(--ant-color-fill-secondary)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
           }}
         >
           <div
@@ -1327,11 +1504,36 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           </div>
           <span>立即登录</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--ant-color-text-tertiary)" }}>
-          <CheckCircleOutlined style={{ color: "#52c41a" }} />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "3px 12px",
+            borderRadius: 10,
+            background: "var(--ant-color-success-bg)",
+            color: "var(--ant-color-success)",
+            fontSize: 12,
+          }}
+        >
+          <CheckCircleOutlined style={{ fontSize: 12 }} />
           <span>已加载 {installed.length} 个插件</span>
         </div>
-        <SettingOutlined style={{ cursor: "pointer" }} />
+        <SettingOutlined
+          style={{
+            cursor: "pointer",
+            padding: 5,
+            borderRadius: 6,
+            transition: "background 0.12s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background =
+              "var(--ant-color-fill-secondary)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+          }}
+        />
       </div>
     </div>
   );
