@@ -482,17 +482,31 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               <span>{query ? "无匹配插件" : "尚未安装任何插件应用"}</span>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {builtinInstalled.length > 0 && (
                 <div
                   style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    letterSpacing: 0.2,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 0.6,
                     color: "var(--ant-color-text-tertiary)",
-                    padding: "6px 10px 2px",
+                    textTransform: "uppercase",
+                    padding: "10px 10px 6px",
+                    borderTop: "1px dashed var(--ant-color-border-secondary)",
+                    marginTop: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                   }}
                 >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "var(--ant-color-primary)",
+                    }}
+                  />
                   内置 ({builtinInstalled.length})
                 </div>
               )}
@@ -500,15 +514,28 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               {extInstalled.length > 0 && (
                 <div
                   style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    letterSpacing: 0.2,
-                    color: "var(--ant-color-text-tertiary)",
-                    padding: "10px 10px 2px",
-                    marginTop: 6,
-                    borderTop: "1px solid var(--ant-color-border-secondary)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 0.6,
+                    color: "#722ed1",
+                    textTransform: "uppercase",
+                    padding: "14px 10px 6px",
+                    borderTop: "1.5px solid #722ed1",
+                    marginTop: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                   }}
                 >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#722ed1",
+                      boxShadow: "0 0 6px rgba(114,46,209,0.5)",
+                    }}
+                  />
                   外部插件 ({extInstalled.length})
                 </div>
               )}
@@ -589,30 +616,53 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                 const groupTools = g.tools.filter((t) => !disabled.includes(t.key));
                 if (groupTools.length === 0) return null;
                 return (
-                  <div key={g.key} style={{ marginBottom: 28 }}>
+                  <div
+                    key={g.key}
+                    style={{
+                      marginBottom: 28,
+                      background: "var(--ant-color-bg-container)",
+                      border: "1px solid var(--ant-color-border-secondary)",
+                      borderLeft: "3px solid var(--ant-color-primary)",
+                      borderRadius: 10,
+                      padding: "16px 18px 18px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                    }}
+                  >
                     <div
                       style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        paddingBottom: 8,
-                        borderBottom: "1px solid var(--ant-color-border-secondary)",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        letterSpacing: 0.3,
+                        paddingBottom: 10,
+                        borderBottom: "1.5px solid var(--ant-color-border-secondary)",
                         marginBottom: 12,
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 8,
+                        color: "var(--ant-color-text)",
                       }}
                     >
-                      {g.icon}
+                      <span style={{ fontSize: 16, color: "var(--ant-color-primary)" }}>{g.icon}</span>
                       <span>{g.label}</span>
-                      <span style={{ color: "var(--ant-color-text-tertiary)", fontWeight: 400 }}>
-                        ({groupTools.length})
+                      <span
+                        style={{
+                          color: "var(--ant-color-text-tertiary)",
+                          fontWeight: 500,
+                          fontSize: 12,
+                          background: "var(--ant-color-fill-tertiary)",
+                          padding: "1px 8px",
+                          borderRadius: 10,
+                          marginLeft: 4,
+                        }}
+                      >
+                        {groupTools.length}
                       </span>
                     </div>
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                        gap: 12,
+                        gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                        gap: 10,
                       }}
                     >
                       {groupTools.map((t) => (
@@ -621,11 +671,10 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                           data-no-drag
                           onClick={() => onSelectTool(t.key)}
                           style={{
-                            background: "var(--ant-color-bg-container)",
+                            background: "var(--ant-color-bg-layout)",
                             border: "1px solid var(--ant-color-border-secondary)",
-                            borderRadius: 8,
-                            padding: 12,
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                            borderRadius: 6,
+                            padding: "8px 10px",
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
@@ -633,12 +682,14 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                             transition: "all 0.16s",
                           }}
                           onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor =
-                              "var(--ant-color-primary)";
+                            const el = e.currentTarget as HTMLElement;
+                            el.style.borderColor = "var(--ant-color-primary)";
+                            el.style.background = "var(--ant-color-primary-bg)";
                           }}
                           onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor =
-                              "var(--ant-color-border-secondary)";
+                            const el = e.currentTarget as HTMLElement;
+                            el.style.borderColor = "var(--ant-color-border-secondary)";
+                            el.style.background = "var(--ant-color-bg-layout)";
                           }}
                         >
                           <span style={{ fontSize: 14, color: "var(--ant-color-primary)" }}>
@@ -670,11 +721,17 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               {extPlugins.filter(p => !p.error).length > 0 && (
                 <div
                   style={{
-                    marginBottom: 24,
+                    marginBottom: 0,
+                    padding: "20px 20px 24px",
                     background: "var(--ant-color-bg-container)",
                     border: "1px solid var(--ant-color-border-secondary)",
-                    borderRadius: 12,
-                    padding: "16px 16px 20px",
+                    borderLeft: "4px solid #722ed1",
+                    borderTopLeftRadius: 14,
+                    borderTopRightRadius: 14,
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                    borderBottom: "none",
+                    boxShadow: "0 2px 8px -2px rgba(114,46,209,0.08)",
                   }}
                 >
                   <div
@@ -682,35 +739,36 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
-                      paddingBottom: 12,
-                      borderBottom: "1px solid var(--ant-color-border-secondary)",
-                      marginBottom: 14,
+                      paddingBottom: 14,
+                      borderBottom: "2px solid rgba(114,46,209,0.18)",
+                      marginBottom: 16,
                     }}
                   >
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: 32,
+                        height: 32,
                         borderRadius: 8,
-                        background: "rgba(114,46,209,0.12)",
+                        background: "linear-gradient(135deg, rgba(114,46,209,0.18) 0%, rgba(114,46,209,0.08) 100%)",
                         color: "#722ed1",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: 700,
                       }}
                     >
                       <AppstoreOutlined />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.2 }}>
                         已安装的市场插件
                       </div>
                       <div
                         style={{
                           fontSize: 11,
                           color: "var(--ant-color-text-tertiary)",
+                          marginTop: 2,
                         }}
                       >
                         本地已装, 可直接打开
@@ -718,12 +776,13 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                     </div>
                     <div
                       style={{
-                        background: "#722ed1",
+                        background: "linear-gradient(135deg, #722ed1 0%, #5319a8 100%)",
                         color: "white",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "2px 10px",
-                        borderRadius: 10,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "3px 12px",
+                        borderRadius: 12,
+                        boxShadow: "0 2px 6px rgba(114,46,209,0.3)",
                       }}
                     >
                       {extPlugins.filter(p => !p.error).length}
@@ -844,17 +903,27 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                 </div>
               ) : (
                 <div>
-                  {marketGroups.map((g) => (
+                  {marketGroups.map((g, idx) => (
                 <div
                   key={g.source.id}
                   style={{
-                    marginBottom: 24,
+                    marginBottom: 0,
+                    padding: "20px 20px 24px",
                     background: "var(--ant-color-bg-container)",
                     border: `1px solid ${
                       g.source.lastError ? "#ffccc7" : "var(--ant-color-border-secondary)"
                     }`,
-                    borderRadius: 12,
-                    padding: "16px 16px 20px",
+                    borderLeft: g.source.lastError
+                      ? "4px solid #ff4d4f"
+                      : "4px solid #1677ff",
+                    borderTopLeftRadius: idx === 0 && extPlugins.filter(p => !p.error).length === 0 ? 14 : 0,
+                    borderTopRightRadius: idx === 0 && extPlugins.filter(p => !p.error).length === 0 ? 14 : 0,
+                    borderBottomLeftRadius: idx === marketGroups.length - 1 ? 14 : 0,
+                    borderBottomRightRadius: idx === marketGroups.length - 1 ? 14 : 0,
+                    borderTop: idx === 0 && extPlugins.filter(p => !p.error).length > 0 ? "1px dashed var(--ant-color-border-secondary)" : undefined,
+                    boxShadow: g.source.lastError
+                      ? "0 2px 8px -2px rgba(255,77,79,0.12)"
+                      : "0 2px 8px -2px rgba(22,119,255,0.08)",
                   }}
                 >
                   {/* 源 header */}
@@ -863,30 +932,32 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
-                      paddingBottom: 12,
-                      borderBottom: "1px solid var(--ant-color-border-secondary)",
-                      marginBottom: 14,
+                      paddingBottom: 14,
+                      borderBottom: g.source.lastError
+                        ? "2px solid rgba(255,77,79,0.2)"
+                        : "2px solid rgba(22,119,255,0.18)",
+                      marginBottom: 16,
                     }}
                   >
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: 32,
+                        height: 32,
                         borderRadius: 8,
                         background: g.source.lastError
-                          ? "rgba(255,77,79,0.12)"
-                          : "rgba(22,119,255,0.12)",
+                          ? "linear-gradient(135deg, rgba(255,77,79,0.18) 0%, rgba(255,77,79,0.08) 100%)"
+                          : "linear-gradient(135deg, rgba(22,119,255,0.18) 0%, rgba(22,119,255,0.08) 100%)",
                         color: g.source.lastError ? "#ff4d4f" : "#1677ff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 14,
+                        fontSize: 16,
                       }}
                     >
                       <WifiOutlined />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.2 }}>
                         {g.source.label ?? g.source.cachedList?.name ?? "未命名源"}
                       </div>
                       <div
@@ -897,6 +968,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
+                          marginTop: 2,
                         }}
                       >
                         {g.source.url}
@@ -904,12 +976,17 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                     </div>
                     <div
                       style={{
-                        background: g.source.lastError ? "#ff4d4f" : "#1677ff",
+                        background: g.source.lastError
+                          ? "linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)"
+                          : "linear-gradient(135deg, #1677ff 0%, #0958d9 100%)",
                         color: "white",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "2px 10px",
-                        borderRadius: 10,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "3px 12px",
+                        borderRadius: 12,
+                        boxShadow: g.source.lastError
+                          ? "0 2px 6px rgba(255,77,79,0.3)"
+                          : "0 2px 6px rgba(22,119,255,0.3)",
                         flexShrink: 0,
                       }}
                       title={
@@ -1211,8 +1288,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
       {/* 底部: 立即登录 + 设置 */}
       <div
         style={{
-          padding: "8px 16px",
-          borderTop: "1px solid var(--ant-color-border-secondary)",
+          padding: "10px 16px",
+          borderTop: "2px solid var(--ant-color-border-secondary)",
           background: "var(--ant-color-bg-container)",
           display: "flex",
           alignItems: "center",
