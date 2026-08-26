@@ -1241,13 +1241,17 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     : it.isUpdate
                                     ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
                                     : it.installed
-                                    ? "var(--ant-color-bg-layout)"
+                                    ? "rgba(82, 196, 26, 0.12)"
                                     : "var(--ant-color-primary)",
                                 color:
-                                  it.installed && !it.isUpdate
+                                  installing === it.key
                                     ? "var(--ant-color-text-tertiary)"
+                                    : it.installed && !it.isUpdate
+                                    ? "#52c41a"
                                     : "white",
-                                border: 0,
+                                border: it.installed && !it.isUpdate
+                                  ? "1px solid rgba(82, 196, 26, 0.32)"
+                                  : 0,
                                 borderRadius: 6,
                                 cursor:
                                   installing === it.key
@@ -1256,8 +1260,10 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     ? "not-allowed"
                                     : "pointer",
                                 fontSize: 12,
-                                fontWeight: 500,
+                                fontWeight: it.installed && !it.isUpdate ? 600 : 500,
                                 boxShadow: installing
+                                  ? "none"
+                                  : it.installed && !it.isUpdate
                                   ? "none"
                                   : "0 2px 6px -1px rgba(0,0,0,0.15)",
                                 transition: "all 0.16s",
@@ -1268,7 +1274,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                 : it.isUpdate
                                 ? "更新"
                                 : it.installed
-                                ? "已装"
+                                ? "✓ 已装"
                                 : "安装"}
                             </button>
                           </div>
