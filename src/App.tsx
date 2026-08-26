@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, DragHandle } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
@@ -278,87 +278,77 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
         background: "var(--ant-color-bg-container)",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px",
-          borderBottom: "1px solid var(--ant-color-border-secondary)",
-          background:
-            "linear-gradient(180deg, var(--ant-color-bg-container) 0%, transparent 100%)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        }}
+      <DragHandle
+        right={
+          <div style={{ display: "flex", gap: 2 }}>
+            <Tooltip title="最小化">
+              <Button
+                size="small"
+                type="text"
+                icon={<MinusOutlined />}
+                onClick={onMinimize}
+                style={{ width: 28, height: 28, borderRadius: 8 }}
+              />
+            </Tooltip>
+            <Tooltip title="隐藏 (⌥Space)">
+              <Button
+                size="small"
+                type="text"
+                icon={<CloseOutlined />}
+                onClick={onClose}
+                style={{ width: 28, height: 28, borderRadius: 8 }}
+              />
+            </Tooltip>
+          </div>
+        }
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Tooltip title="返回 (esc)">
-            <Button
-              size="small"
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={onBack}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-              }}
-            />
-          </Tooltip>
-          <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
-            {title}
-          </Typography.Text>
-          {group && (
-            <Tag
-              color="blue"
-              style={{
-                fontSize: 11,
-                borderRadius: 6,
-                padding: "0 8px",
-                margin: 0,
-                fontWeight: 500,
-              }}
-            >
-              {group}
-            </Tag>
-          )}
-          {isExternal && (
-            <Tag
-              color="purple"
-              style={{
-                fontSize: 11,
-                borderRadius: 6,
-                padding: "0 8px",
-                margin: 0,
-                fontWeight: 500,
-              }}
-            >
-              外部插件
-            </Tag>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 2 }}>
-          <Tooltip title="最小化">
-            <Button
-              size="small"
-              type="text"
-              icon={<MinusOutlined />}
-              onClick={onMinimize}
-              style={{ width: 28, height: 28, borderRadius: 8 }}
-            />
-          </Tooltip>
-          <Tooltip title="隐藏 (⌥Space)">
-            <Button
-              size="small"
-              type="text"
-              icon={<CloseOutlined />}
-              onClick={onClose}
-              style={{ width: 28, height: 28, borderRadius: 8 }}
-            />
-          </Tooltip>
-        </div>
-      </div>
+        <Tooltip title="返回 (esc)">
+          <Button
+            size="small"
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={onBack}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+            }}
+          />
+        </Tooltip>
+        <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
+          {title}
+        </Typography.Text>
+        {group && (
+          <Tag
+            color="blue"
+            style={{
+              fontSize: 11,
+              borderRadius: 6,
+              padding: "0 8px",
+              margin: 0,
+              fontWeight: 500,
+            }}
+          >
+            {group}
+          </Tag>
+        )}
+        {isExternal && (
+          <Tag
+            color="purple"
+            style={{
+              fontSize: 11,
+              borderRadius: 6,
+              padding: "0 8px",
+              margin: 0,
+              fontWeight: 500,
+            }}
+          >
+            外部插件
+          </Tag>
+        )}
+      </DragHandle>
       <div
+        data-tauri-drag-region
         style={{
           flex: 1,
           overflow: "auto",
