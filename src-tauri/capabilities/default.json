@@ -17,6 +17,19 @@
     "clipboard-manager:default",
     "dialog:default",
     "fs:default",
+    "fs:allow-mkdir",
+    "fs:allow-write-text-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-read-text-file",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/.z-biz-tools/**" },
+        { "path": "$HOME/.z-biz-tools" }
+      ]
+    },
     "shell:default",
     {
       "identifier": "http:default",

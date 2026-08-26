@@ -412,7 +412,7 @@ export default function PluginMarket() {
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             <CodeOutlined /> 开发外部插件:{" "}
             <code style={{ padding: "0 4px", background: "var(--ant-color-fill-tertiary)", borderRadius: 3 }}>
-              ~/Library/Application Support/com.zifang.z-biz-tool-box/plugins/{`<id>`}/plugin.json
+              ~/.z-biz-tools/plugins/{`<id>`}/plugin.json
             </code>
           </Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>

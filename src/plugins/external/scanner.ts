@@ -1,23 +1,19 @@
 /**
  * 外部插件扫描器 — 启动时 + 用户手动刷新时调用。
  *
- * 扫描 ~/Library/Application Support/com.zifang.z-biz-tool-box/plugins/,
- * 每个子目录读 plugin.json,解析成 ExternalPlugin。
- *
+ * 扫描 ~/.z-biz-tools/plugins/, 每个子目录读 plugin.json,解析成 ExternalPlugin。
  * 异常隔离: 单个插件出错不影响其他插件加载。
  */
 import { readDir, readTextFile, exists } from "@tauri-apps/plugin-fs";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { ExternalPlugin, ExternalPluginManifest } from "./types";
-
-const PLUGIN_DIR_NAME = "plugins";
+import { getPluginsDir } from "./paths";
 
 let cachedDir: string | null = null;
-async function getPluginsDir(): Promise<string> {
+async function pluginsDir(): Promise<string> {
   if (cachedDir) return cachedDir;
-  const base = await appDataDir();
-  cachedDir = await join(base, PLUGIN_DIR_NAME);
+  cachedDir = await getPluginsDir();
   return cachedDir;
 }
 
@@ -26,7 +22,7 @@ async function getPluginsDir(): Promise<string> {
  * 失败/不合法的会被记录到 error 字段,不抛异常。
  */
 export async function scanExternalPlugins(): Promise<ExternalPlugin[]> {
-  const dir = await getPluginsDir();
+  const dir = await pluginsDir();
   let entries: Awaited<ReturnType<typeof readDir>> = [];
   try {
     entries = await readDir(dir);
@@ -92,7 +88,7 @@ async function loadOnePlugin(
 
 /** 暴露给 UI,用户在 QuickOpen 或 PluginMarket 里可一键打开插件目录 */
 export async function openPluginsDir(): Promise<void> {
-  const dir = await getPluginsDir();
+  const dir = await pluginsDir();
   const { open } = await import("@tauri-apps/plugin-shell");
   await open(dir);
 }

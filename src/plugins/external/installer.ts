@@ -19,21 +19,16 @@
 
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { mkdir, writeFile, writeTextFile, exists } from "@tauri-apps/plugin-fs";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
 import type {
   ExternalPluginManifest,
   MarketPluginEntry,
   MarketSource,
 } from "./types";
 import { mainHtmlUrl, pluginJsonUrl, logoUrl, validateMarketUrl } from "./market";
+import { getPluginsDir } from "./paths";
 
-const PLUGIN_DIR_NAME = "plugins";
 const FETCH_TIMEOUT_MS = 15_000;
-
-async function getPluginsDir(): Promise<string> {
-  const base = await appDataDir();
-  return await join(base, PLUGIN_DIR_NAME);
-}
 
 async function downloadText(url: string): Promise<string> {
   const resp = await tauriFetch(url, {
