@@ -124,7 +124,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
       <Card size="small" type="inner" title="添加市场源" style={{ marginBottom: 16 }}>
         <Space.Compact style={{ width: "100%" }}>
           <Input
-            placeholder="https://example.com/market/v1   (注意不要带 /list)"
+            placeholder="http(s)://example.com/market/v1   (注意不要带 /list)"
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
             onPressEnter={handleAdd}

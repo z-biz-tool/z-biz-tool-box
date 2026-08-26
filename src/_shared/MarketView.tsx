@@ -269,7 +269,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
           }}
           title={
             marketSources.length === 0
-              ? "添加市场源(填一个 https://... 拉取远程插件)"
+              ? "添加市场源(填一个 http(s)://... 拉取远程插件)"
               : `管理市场源 (${healthySources}/${marketSources.length} 健康)`
           }
         >

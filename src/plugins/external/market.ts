@@ -7,7 +7,7 @@
  * 流程:
  *   1. UI 调 addMarketSource(url) → 写入 zustand
  *   2. UI 调 fetchMarketSource(source) → 这里实现
- *      - 校验 base url 协议(只接受 https / 本地 http)
+ *      - 校验 base url 协议(http / https 均可, 内网联调友好)
  *      - 拼接 {B}/list, 用 @tauri-apps/plugin-http 的 fetch(走 Rust, 绕开 CORS)
  *      - 解析 JSON + validateList 校验
  *      - 成功 → 写回 cachedList + 清空 lastError
@@ -36,8 +36,7 @@ export class MarketUrlError extends Error {
 
 /**
  * 校验 base URL 是否可接受,并去掉末尾的 "/" 便于拼接。
- * - 必须 https://
- * - 例外: http://localhost / http://127.0.0.1 / http://[::1] (本地开发)
+ * - http:// 和 https:// 均可 (内网/本地联调友好)
  * - 不能是 file:// / data: / blob: 等
  */
 export function validateMarketUrl(url: string): string {
@@ -49,15 +48,8 @@ export function validateMarketUrl(url: string): string {
   } catch {
     throw new MarketUrlError("不是合法的 URL");
   }
-  if (parsed.protocol === "https:") {
+  if (parsed.protocol === "https:" || parsed.protocol === "http:") {
     return parsed.toString().replace(/\/+$/, "");
-  }
-  if (parsed.protocol === "http:") {
-    const host = parsed.hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
-      return parsed.toString().replace(/\/+$/, "");
-    }
-    throw new MarketUrlError("只接受 https:// 协议(本地 localhost 例外)");
   }
   throw new MarketUrlError(`不支持的协议: ${parsed.protocol}`);
 }
@@ -68,13 +60,15 @@ export function validateMarketUrl(url: string): string {
 
 /**
  * 把 base URL 和 path 拼成完整 URL。
- *  - 绝对 path (以 / 开头): 替换 base 的 path
- *  - 相对 path: 拼到 base path 后面
+ *  - 绝对 path (以 / 开头): 保留 base 的路径前缀再拼接
+ *    (base 可带 /kapi/... 等前缀, 之前直接丢弃导致 404)
+ *  - 相对 path: 拼到 base 后面
  */
 export function joinUrl(base: string, path: string): string {
   if (path.startsWith("/")) {
     const b = new URL(base);
-    return `${b.protocol}//${b.host}${path}`;
+    const dir = b.pathname.replace(/\/+$/, "");
+    return `${b.protocol}//${b.host}${dir}${path}`;
   }
   return `${base.replace(/\/+$/, "")}/${path}`;
 }
