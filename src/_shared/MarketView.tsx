@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Badge, message, Popconfirm, Typography } from "antd";
+import { Input, Badge, message, Popconfirm, Tag, Typography } from "antd";
 import {
   SearchOutlined,
   ArrowLeftOutlined,
@@ -45,9 +45,17 @@ interface MarketViewProps {
  */
 export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool }: MarketViewProps) {
   const [query, setQuery] = useState("");
-  const [rightTab, setRightTab] = useState<"installed" | "remote">("remote");
+  const [rightTab, setRightTab] = useState<"builtin" | "market">("builtin");
   const [installing, setInstalling] = useState<string | null>(null);
   const inputRef = useRef<any>(null);
+
+  // 切 tab 时清搜索框, 避免跨 tab 名字/筛选污染
+  const switchTab = (t: "builtin" | "market") => {
+    if (t !== rightTab) {
+      setRightTab(t);
+      setQuery(""); // 重置搜索
+    }
+  };
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
@@ -490,40 +498,41 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           >
             <div style={{ display: "flex", gap: 4 }}>
               <button
-                onClick={() => setRightTab("installed")}
+                onClick={() => switchTab("builtin")}
                 style={{
                   padding: "4px 12px",
                   fontSize: 12,
-                  background: rightTab === "installed" ? "var(--ant-color-primary)" : "transparent",
-                  color: rightTab === "installed" ? "white" : "var(--ant-color-text)",
+                  background: rightTab === "builtin" ? "var(--ant-color-primary)" : "transparent",
+                  color: rightTab === "builtin" ? "white" : "var(--ant-color-text)",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
                   fontWeight: 500,
                 }}
               >
-                📦 已装 ({installed.length})
+                🏠 内置 ({TOOL_GROUPS.reduce((s, g) => s + g.tools.filter(t => !disabled.includes(t.key)).length, 0)})
               </button>
               <button
-                onClick={() => setRightTab("remote")}
+                onClick={() => switchTab("market")}
                 style={{
                   padding: "4px 12px",
                   fontSize: 12,
-                  background: rightTab === "remote" ? "var(--ant-color-primary)" : "transparent",
-                  color: rightTab === "remote" ? "white" : "var(--ant-color-text)",
+                  background: rightTab === "market" ? "var(--ant-color-primary)" : "transparent",
+                  color: rightTab === "market" ? "white" : "var(--ant-color-text)",
                   border: 0,
                   borderRadius: 6,
                   cursor: "pointer",
                   fontWeight: 500,
                 }}
               >
-                🌐 远程 ({marketGroups.reduce((s, g) => s + g.plugins.length, 0)})
+                🛒 市场 ({extPlugins.filter(p => !p.error).length} /{" "}
+                {marketGroups.reduce((s, g) => s + g.plugins.length, 0)})
               </button>
             </div>
-            {rightTab === "remote" && marketGroups.length > 0 && (
+            {rightTab === "market" && (
               <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                {marketSources.filter((s) => s.enabled).length} 个源 ·{" "}
-                {marketGroups.reduce((s, g) => s + g.plugins.length, 0)} 个可装/可更新
+                {extPlugins.filter(p => !p.error).length} 已装 /{" "}
+                {marketGroups.reduce((s, g) => s + g.plugins.length, 0)} 可装
               </Typography.Text>
             )}
           </div>
@@ -534,8 +543,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                 搜索 "{query}" 的已装插件 ({filteredInstalled.length})
               </div>
             </div>
-          ) : rightTab === "installed" ? (
-            // 已装 tab — 按组展示
+          ) : rightTab === "builtin" ? (
+            // 内置 tab — 按 TOOL_GROUPS 展示 builtin 工具
             <div style={{ padding: "16px 24px 32px" }}>
               {TOOL_GROUPS.map((g) => {
                 const groupTools = g.tools.filter((t) => !disabled.includes(t.key));
@@ -612,48 +621,143 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                 );
               })}
             </div>
-          ) : marketGroups.length === 0 ? (
-            // 远程 tab 但无源 — 引导
-            <div
-              style={{
-                height: "calc(100% - 60px)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 32,
-                color: "var(--ant-color-text-tertiary)",
-                gap: 12,
-              }}
-            >
-              <AppstoreOutlined style={{ fontSize: 48, opacity: 0.3 }} />
-              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ant-color-text)" }}>
-                还没有市场源
-              </div>
-              <div style={{ fontSize: 12, textAlign: "center", maxWidth: 360 }}>
-                添加一个市场源(base URL)就能看到可安装的远程插件。
-                <br />
-                支持多个源并行, 已装的会自动跳过。
-              </div>
-              <button
-                onClick={onOpenMarketSources}
-                style={{
-                  marginTop: 8,
-                  padding: "6px 16px",
-                  background: "var(--ant-color-primary)",
-                  color: "white",
-                  border: 0,
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 13,
-                }}
-              >
-                添加市场源
-              </button>
-            </div>
           ) : (
+            // 市场 tab: 已装的 ext 插件 + 按源分组的远程插件
             <div style={{ padding: "16px 24px 32px" }}>
-              {marketGroups.map((g) => (
+              {/* 第一段: 已装的 external 插件 (从 extPlugins) */}
+              {extPlugins.filter(p => !p.error).length > 0 && (
+                <div style={{ marginBottom: 28 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 12,
+                      paddingBottom: 8,
+                      borderBottom: "1px solid var(--ant-color-border-secondary)",
+                    }}
+                  >
+                    <AppstoreOutlined style={{ color: "#722ed1" }} />
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>已装的市场插件</div>
+                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                      ({extPlugins.filter(p => !p.error).length})
+                    </Typography.Text>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {extPlugins.filter(p => !p.error).map((p) => (
+                      <div
+                        key={p.id}
+                        data-no-drag
+                        onClick={() => onSelectTool(`ext::${p.id}::${p.features[0]?.code ?? ''}`)}
+                        style={{
+                          background: "var(--ant-color-bg-container)",
+                          border: "1px solid var(--ant-color-border-secondary)",
+                          borderRadius: 8,
+                          padding: 10,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          cursor: "pointer",
+                          transition: "all 0.16s",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "var(--ant-color-primary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "var(--ant-color-border-secondary)";
+                        }}
+                      >
+                        {p.logoUrl ? (
+                          <img
+                            src={p.logoUrl}
+                            alt={p.name}
+                            style={{ width: 18, height: 18, borderRadius: 3 }}
+                          />
+                        ) : (
+                          <AppstoreOutlined style={{ fontSize: 16, color: "#722ed1" }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "var(--ant-color-text-tertiary)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.features.length} 个 feature
+                          </div>
+                        </div>
+                        <Tag color="purple" style={{ fontSize: 10, margin: 0 }}>
+                          v{p.version}
+                        </Tag>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 第二段: 市场源 — 远程插件 (按源分组) */}
+              {marketGroups.length === 0 ? (
+                // 没有任何源 — 引导
+                <div
+                  style={{
+                    padding: "40px 24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                    color: "var(--ant-color-text-tertiary)",
+                  }}
+                >
+                  <WifiOutlined style={{ fontSize: 48, opacity: 0.3 }} />
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ant-color-text)" }}>
+                    还没有市场源
+                  </div>
+                  <div style={{ fontSize: 12, textAlign: "center", maxWidth: 360 }}>
+                    添加一个市场源(base URL)就能看到可安装的远程插件。
+                    <br />
+                    支持多个源并行, 已装的会自动跳过。
+                  </div>
+                  <button
+                    onClick={onOpenMarketSources}
+                    style={{
+                      marginTop: 8,
+                      padding: "6px 16px",
+                      background: "var(--ant-color-primary)",
+                      color: "white",
+                      border: 0,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    添加市场源
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: "16px 24px 32px" }}>
+                  {marketGroups.map((g) => (
                 <div key={g.source.id} style={{ marginBottom: 28 }}>
                   {/* 源 header */}
                   <div
@@ -954,6 +1058,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             </div>
           )}
         </div>
+        )}
+      </div>
       </div>
 
       {/* 底部: 立即登录 + 设置 */}
