@@ -97,6 +97,7 @@ export async function openPluginsDir(): Promise<void> {
 /**
  * 卸载本地外部插件: 删 ~/.z-biz-tools/plugins/{id}/ 整个目录
  * 调 Rust command `uninstall_plugin` (用 std::fs::remove_dir_all 支持递归)
+ * 不管成功失败都触发 scanner 重新加载, 让 UI 状态跟实际磁盘一致
  * @throws 失败抛 Error(UI 弹 message)
  */
 export async function uninstallLocalPlugin(pluginId: string): Promise<void> {
@@ -104,7 +105,11 @@ export async function uninstallLocalPlugin(pluginId: string): Promise<void> {
     throw new Error(`非法 plugin id: ${pluginId}`);
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("uninstall_plugin", { id: pluginId });
-  // 触发 scanner 重新加载
-  await scanExternalPlugins();
+  try {
+    await invoke("uninstall_plugin", { id: pluginId });
+  } finally {
+    // 不论成功失败都刷新 scanner, 保证 UI 跟磁盘状态一致
+    // (目录已被人为删过/移动过等情况, Rust 返回 Ok, 也会被 scanner 清掉)
+    await scanExternalPlugins();
+  }
 }

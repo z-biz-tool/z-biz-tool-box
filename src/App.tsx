@@ -354,6 +354,9 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
           flex: 1,
           overflow: "auto",
           background: "var(--ant-color-bg-layout)",
+          // 外部插件 PluginIframe 用 absolute inset:0 铺满本区域;
+          // 没有定位基准时会穿透到 App 根, 盖住顶栏(返回/最小化/关闭都点不到)
+          position: "relative",
         }}
         className="zBizScroll"
       >

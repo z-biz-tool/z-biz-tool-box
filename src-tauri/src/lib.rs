@@ -127,7 +127,7 @@ fn apply_window_prefs(app: tauri::AppHandle, prefs: WindowPrefs) -> Result<(), S
 /// 卸载外部插件: 递归删除 ~/.z-biz-tools/plugins/{id}/
 /// - id 严格校验 (防路径穿越: 只允许 [a-zA-Z0-9._-]+)
 /// - 用 std::fs::remove_dir_all 走 Rust 端, 避免 shell 权限问题
-/// - 失败抛错到前端(UI 弹 message.error)
+/// - 目录不存在视为幂等成功(不抛错), 让前端 scanner 重新扫描清掉缓存条目
 #[tauri::command]
 fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
     if id.is_empty()
@@ -143,7 +143,9 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| format!("home_dir 失败: {e}"))?;
     let dir = home.join(".z-biz-tools").join("plugins").join(&id);
     if !dir.exists() {
-        return Err(format!("插件目录不存在: {}", dir.display()));
+        // 目录已不在 → 幂等: 不报错, 让前端 scanner 重新加载清掉 ext store 里的缓存条目
+        eprintln!("[z-biz] uninstall: dir already gone: {id} (path={})", dir.display());
+        return Ok(());
     }
     std::fs::remove_dir_all(&dir).map_err(|e| format!("删除失败: {e}"))?;
     eprintln!("[z-biz] uninstalled plugin: {id} (path={})", dir.display());
