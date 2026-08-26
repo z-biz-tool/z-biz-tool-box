@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Badge } from "antd";
+import { Input, Badge, message } from "antd";
 import {
   SearchOutlined,
   ArrowLeftOutlined,
@@ -13,11 +13,14 @@ import {
   CheckCircleOutlined,
   WifiOutlined,
 } from "@ant-design/icons";
-import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
+import { TOOL_GROUPS } from "../plugins/_registry";
 import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir } from "../plugins/external/scanner";
 import { useUiStore } from "../stores/uiStore";
 import { DragHandle } from "./DragHandle";
+import { isNewer } from "../plugins/external/market";
+import { installRemotePlugin } from "../plugins/external/installer";
+import type { MarketSource, MarketPluginEntry } from "../plugins/external/types";
 
 interface MarketViewProps {
   onClose: () => void;
@@ -33,11 +36,13 @@ interface MarketViewProps {
  *  - 底部: 立即登录 + 设置
  *
  * 数据策略:
- *  - "已安装" = builtin tools + ext plugins
- *  - "精选" / "排行榜" = mock 推荐(没有后端推荐系统, 从 builtin 工具里挑)
+ *  - "已安装" (左列) = builtin tools + ext plugins
+ *  - "按源分组的远程插件" (右列) = 所有 enabled 源 cachedList.plugins,
+ *    按源分组, 每个插件标注"未装" / "已装" / "有新版本"
  */
 export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewProps) {
   const [query, setQuery] = useState("");
+  const [installing, setInstalling] = useState<string | null>(null);
   const inputRef = useRef<any>(null);
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
@@ -80,96 +85,68 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
     return items;
   }, [extPlugins]);
 
-  // 精选: 取 1 大 + 4 小 (从 builtin 挑有特色的, 实际 utools 是后端推荐)
-  const featured = useMemo(() => {
-    const pick = (key: string): { name: string; desc: string; icon: React.ReactNode; bg: string } => {
-      const t = ALL_TOOLS.find((x) => x.key === key);
-      if (!t) return { name: key, desc: "", icon: <AppstoreOutlined />, bg: "#f0f5ff" };
-      const palettes: Record<string, string> = {
-        hash: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        exchange: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-        timestamp: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-        http: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-        color: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-        jwt: "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-        json: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
-        uuid: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
-      };
-      return { name: t.label, desc: t.description, icon: t.icon, bg: palettes[key] ?? "#f0f5ff" };
-    };
-    return {
-      big: pick("hash"),
-      small: [
-        pick("exchange"),
-        pick("timestamp"),
-        pick("http"),
-        pick("color"),
-      ],
-    };
-  }, []);
-
-  // 排行榜 8 类
-  const rankings = useMemo(
-    () => [
-      {
-        title: "最受欢迎",
-        icon: "👍",
-        desc: "社区热门工具",
-        toolKey: "json",
-        bg: "linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)",
-      },
-      {
-        title: "最新上架",
-        icon: "🆕",
-        desc: "本周新加入",
-        toolKey: "uuid",
-        bg: "linear-gradient(135deg, #a8e6cf 0%, #56ab91 100%)",
-      },
-      {
-        title: "高效办公",
-        icon: "👁",
-        desc: "日常办公效率",
-        toolKey: "exchange",
-        bg: "linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)",
-      },
-      {
-        title: "AI 智能",
-        icon: "👁",
-        desc: "与 AI 同行",
-        toolKey: "json",
-        bg: "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
-      },
-      {
-        title: "记录想法",
-        icon: "✏️",
-        desc: "记录灵感",
-        toolKey: "case",
-        bg: "linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%)",
-      },
-      {
-        title: "系统工具",
-        icon: "🛡",
-        desc: "提升系统效能",
-        toolKey: "clipboard",
-        bg: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)",
-      },
-      {
-        title: "开始探索",
-        icon: "🧠",
-        desc: "突破思维",
-        toolKey: "diff",
-        bg: "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)",
-      },
-      {
-        title: "uTools 官方出品",
-        icon: "👍",
-        desc: "精心打造",
-        toolKey: "base64",
-        bg: "linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)",
-      },
-    ],
-    []
+  // 本地 ext 插件 map: id -> ExternalPlugin(用于版本比较)
+  const installedExtMap = useMemo(
+    () => new Map(extPlugins.filter((p) => !p.error).map((p) => [p.id, p])),
+    [extPlugins]
   );
+
+  // 按源分组的远程插件列表
+  // - 跳过已装且同版的(不打扰)
+  // - 未装的标 "未装" + "安装" 按钮
+  // - 已装但有更新的标 "有更新" + v_old → v_new + "更新" 按钮
+  const marketGroups = useMemo(() => {
+    const groups: Array<{
+      source: MarketSource;
+      plugins: Array<{
+        key: string;
+        entry: MarketPluginEntry;
+        installed: boolean;
+        isUpdate: boolean;
+        localVersion?: string;
+      }>;
+    }> = [];
+    for (const src of marketSources) {
+      if (!src.enabled || !src.cachedList) continue;
+      const items = src.cachedList.plugins
+        .map((p) => {
+          const local = installedExtMap.get(p.id);
+          const localV = local?.version ?? "";
+          const isUpdate = Boolean(local && localV && isNewer(p.version, localV));
+          return {
+            key: `${src.id}::${p.id}`,
+            entry: p,
+            installed: !!local,
+            isUpdate,
+            localVersion: localV || undefined,
+          };
+        })
+        // 已装且无更新 → 跳过
+        .filter((it) => !it.installed || it.isUpdate);
+      if (items.length > 0) {
+        groups.push({ source: src, plugins: items });
+      }
+    }
+    return groups;
+  }, [marketSources, installedExtMap]);
+
+  // 装/更新远程插件
+  const handleInstall = async (
+    source: MarketSource,
+    entry: MarketPluginEntry,
+    key: string
+  ) => {
+    setInstalling(key);
+    try {
+      await installRemotePlugin(source, entry);
+      message.success(`已安装 ${entry.name}`);
+      await extRefresh();
+    } catch (e) {
+      message.error(`安装失败: ${String(e)}`);
+    } finally {
+      setInstalling(null);
+    }
+  };
 
   const filteredInstalled = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -419,234 +396,249 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
           )}
         </div>
 
-        {/* 主区: 精选 + 排行榜 */}
+        {/* 主区: 按源分组的远程插件列表 */}
         <div style={{ flex: 1, overflowY: "auto", background: "var(--ant-color-bg-layout)" }}>
           {query ? (
             <div style={{ padding: 24 }}>
               <div style={{ marginBottom: 12, fontSize: 14, color: "var(--ant-color-text)" }}>
-                搜索 "{query}" 的插件应用 ({filteredInstalled.length})
+                搜索 "{query}" 的已装插件 ({filteredInstalled.length})
               </div>
             </div>
+          ) : marketGroups.length === 0 ? (
+            // 空状态: 没源 或 源都是空的
+            <div
+              style={{
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 32,
+                color: "var(--ant-color-text-tertiary)",
+                gap: 12,
+              }}
+            >
+              <AppstoreOutlined style={{ fontSize: 48, opacity: 0.3 }} />
+              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ant-color-text)" }}>
+                还没有市场源
+              </div>
+              <div style={{ fontSize: 12, textAlign: "center", maxWidth: 360 }}>
+                添加一个市场源(base URL)就能看到可安装的远程插件。
+                <br />
+                支持多个源并行, 已装的会自动跳过。
+              </div>
+              <button
+                onClick={onOpenMarketSources}
+                style={{
+                  marginTop: 8,
+                  padding: "6px 16px",
+                  background: "var(--ant-color-primary)",
+                  color: "white",
+                  border: 0,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                添加市场源
+              </button>
+            </div>
           ) : (
-            <>
-              {/* 精选区 */}
-              <div style={{ padding: "20px 24px 0" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>精选</div>
-                  <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--ant-color-text-tertiary)" }}>
-                    <span style={{ cursor: "pointer" }}>🔄</span>
-                    <span style={{ cursor: "pointer" }}>换一批</span>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 1fr 1fr",
-                    gridTemplateRows: "1fr 1fr",
-                    gap: 12,
-                    height: 220,
-                  }}
-                >
-                  {/* 大卡 (左 1 大, 占 2 行) */}
+            <div style={{ padding: "16px 24px 32px" }}>
+              {marketGroups.map((g) => (
+                <div key={g.source.id} style={{ marginBottom: 28 }}>
+                  {/* 源 header */}
                   <div
-                    className="zBizMarketCard"
                     style={{
-                      gridRow: "1 / 3",
-                      gridColumn: "1 / 2",
-                      borderRadius: 14,
-                      background: featured.big.bg,
-                      padding: 22,
-                      color: "white",
-                      cursor: "pointer",
                       display: "flex",
-                      flexDirection: "column",
+                      alignItems: "center",
                       justifyContent: "space-between",
-                      boxShadow:
-                        "0 4px 16px -4px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset",
-                      position: "relative",
-                      overflow: "hidden",
-                      transition: "all 0.24s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.transform =
-                        "translateY(-2px) scale(1.01)";
-                      (e.currentTarget as HTMLElement).style.boxShadow =
-                        "0 12px 32px -8px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.15) inset";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)";
-                      (e.currentTarget as HTMLElement).style.boxShadow =
-                        "0 4px 16px -4px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset";
+                      marginBottom: 12,
+                      paddingBottom: 8,
+                      borderBottom: "1px solid var(--ant-color-border-secondary)",
                     }}
                   >
-                    {/* 装饰圆环 */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        right: -40,
-                        top: -40,
-                        width: 160,
-                        height: 160,
-                        borderRadius: "50%",
-                        background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%)",
-                        pointerEvents: "none",
-                      }}
-                    />
-                    <div style={{ fontSize: 40, color: "rgba(255,255,255,0.95)", position: "relative" }}>
-                      {featured.big.icon}
-                    </div>
-                    <div style={{ position: "relative" }}>
-                      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6, letterSpacing: 0.3 }}>
-                        {featured.big.name}
-                      </div>
-                      <div style={{ fontSize: 12, opacity: 0.92, lineHeight: 1.4 }}>
-                        {featured.big.desc}
-                      </div>
-                    </div>
-                  </div>
-                  {/* 4 个小卡 */}
-                  {featured.small.map((s, i) => (
-                    <div
-                      key={i}
-                      className="zBizMarketCard"
-                      style={{
-                        borderRadius: 12,
-                        background: s.bg,
-                        padding: 14,
-                        color: "white",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        boxShadow:
-                          "0 2px 8px -2px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,255,255,0.1) inset",
-                        position: "relative",
-                        overflow: "hidden",
-                        transition: "all 0.16s cubic-bezier(0.4, 0, 0.2, 1)",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.transform =
-                          "translateY(-3px) scale(1.02)";
-                        (e.currentTarget as HTMLElement).style.boxShadow =
-                          "0 8px 24px -4px rgba(0,0,0,0.24), 0 0 0 1px rgba(255,255,255,0.18) inset";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.transform =
-                          "translateY(0) scale(1)";
-                        (e.currentTarget as HTMLElement).style.boxShadow =
-                          "0 2px 8px -2px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,255,255,0.1) inset";
-                      }}
-                    >
-                      <div
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <WifiOutlined
                         style={{
-                          fontSize: 24,
-                          color: "rgba(255,255,255,0.95)",
-                          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.2))",
+                          color:
+                            g.source.lastError
+                              ? "#ff4d4f"
+                              : "var(--ant-color-primary)",
                         }}
-                      >
-                        {s.icon}
-                      </div>
+                      />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>{s.name}</div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            opacity: 0.88,
-                            lineHeight: 1.35,
-                            marginTop: 2,
-                          }}
-                        >
-                          {s.desc}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 排行榜 8 类 */}
-              <div style={{ padding: "20px 24px 16px" }}>
-                <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 600 }}>排行榜</div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                  }}
-                >
-                  {rankings.map((r) => (
-                    <div
-                      key={r.title}
-                      className="zBizRankingItem"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "12px 14px",
-                        borderRadius: 10,
-                        background: r.bg,
-                        color: "var(--ant-color-text)",
-                        cursor: "pointer",
-                        minHeight: 56,
-                        transition: "all 0.16s cubic-bezier(0.4, 0, 0.2, 1)",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.transform =
-                          "translateY(-1px)";
-                        (e.currentTarget as HTMLElement).style.boxShadow =
-                          "0 4px 12px -2px rgba(0,0,0,0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                        (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 24,
-                          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.1))",
-                        }}
-                      >
-                        {r.icon}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>
-                          {r.title}
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {g.source.label ?? g.source.cachedList?.name ?? "未命名源"}
                         </div>
                         <div
                           style={{
                             fontSize: 11,
                             color: "var(--ant-color-text-tertiary)",
-                            marginTop: 2,
+                            fontFamily: "var(--mono-font)",
                           }}
                         >
-                          {r.desc}
+                          {g.source.url}
                         </div>
                       </div>
+                    </div>
+                    <Badge
+                      count={g.plugins.length}
+                      showZero
+                      color={g.source.lastError ? "red" : "cyan"}
+                      title={g.source.lastError ?? `${g.plugins.length} 个可操作插件`}
+                    />
+                  </div>
+
+                  {/* 插件网格 */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {g.plugins.map((it) => (
                       <div
+                        key={it.key}
                         style={{
-                          fontSize: 11,
-                          color: "var(--ant-color-text-tertiary)",
+                          background: "var(--ant-color-bg-container)",
+                          border: "1px solid var(--ant-color-border-secondary)",
+                          borderRadius: 8,
+                          padding: 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                          transition: "all 0.16s",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "var(--ant-color-primary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "var(--ant-color-border-secondary)";
                         }}
                       >
-                        ›
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              title={it.entry.name}
+                            >
+                              {it.entry.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--ant-color-text-tertiary)",
+                                marginTop: 2,
+                              }}
+                            >
+                              {it.entry.author ?? "未知作者"}
+                            </div>
+                          </div>
+                          {it.isUpdate ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                background: "rgba(250, 173, 20, 0.12)",
+                                color: "#fa8c16",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              有更新
+                            </span>
+                          ) : null}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--ant-color-text-secondary)",
+                            lineHeight: 1.4,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            minHeight: 30,
+                          }}
+                          title={it.entry.description}
+                        >
+                          {it.entry.description || "—"}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginTop: "auto",
+                            paddingTop: 6,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "var(--mono-font)",
+                              color: "var(--ant-color-text-tertiary)",
+                            }}
+                            title={`插件 id: ${it.entry.id}`}
+                          >
+                            v
+                            {it.isUpdate
+                              ? `${it.localVersion} → ${it.entry.version}`
+                              : it.entry.version}
+                          </span>
+                          <button
+                            disabled={installing === it.key}
+                            onClick={() => handleInstall(g.source, it.entry, it.key)}
+                            style={{
+                              padding: "3px 10px",
+                              background:
+                                installing === it.key
+                                  ? "var(--ant-color-fill-secondary)"
+                                  : it.isUpdate
+                                  ? "var(--ant-color-primary)"
+                                  : "var(--ant-color-primary-bg)",
+                              color:
+                                it.isUpdate
+                                  ? "white"
+                                  : "var(--ant-color-primary)",
+                              border: 0,
+                              borderRadius: 4,
+                              cursor: installing === it.key ? "wait" : "pointer",
+                              fontSize: 11,
+                              fontWeight: 500,
+                            }}
+                          >
+                            {installing === it.key
+                              ? "..."
+                              : it.isUpdate
+                              ? "更新"
+                              : "安装"}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div style={{ height: 24 }} />
-            </>
+              ))}
+            </div>
           )}
         </div>
       </div>
