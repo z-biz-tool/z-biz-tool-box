@@ -61,13 +61,22 @@ export function DragHandle({
     >
       {showGrip && (
         <HolderOutlined
-          data-no-drag
+          className="zBizDragHandleGrip"
           style={{
             fontSize: 14,
             color: "var(--ant-color-text-tertiary)",
             opacity: 0.7,
             flexShrink: 0,
             cursor: "grab",
+            transition: "opacity 0.16s, color 0.16s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.opacity = "1";
+            (e.currentTarget as HTMLElement).style.color = "var(--ant-color-primary)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.opacity = "0.7";
+            (e.currentTarget as HTMLElement).style.color = "var(--ant-color-text-tertiary)";
           }}
         />
       )}
