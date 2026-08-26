@@ -1354,7 +1354,36 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                               }}
                             >
                               <span style={{ opacity: 0.7 }}>by</span>
-                              <span>{it.entry.author ?? "未知作者"}</span>
+                              <span
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: 90,
+                                }}
+                                title={it.entry.author ?? "未知作者"}
+                              >
+                                {it.entry.author ?? "未知作者"}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontFamily: "var(--mono-font)",
+                                  color: "var(--ant-color-text-tertiary)",
+                                  marginLeft: "auto",
+                                  flexShrink: 0,
+                                }}
+                                title={`插件 id: ${it.entry.id} · 版本 ${
+                                  it.isUpdate
+                                    ? `${it.localVersion} → ${it.entry.version}`
+                                    : it.entry.version
+                                }`}
+                              >
+                                v
+                                {it.isUpdate
+                                  ? `${it.localVersion} → ${it.entry.version}`
+                                  : it.entry.version}
+                              </span>
                             </div>
                             <div
                               style={{
@@ -1373,35 +1402,21 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                             </div>
                           </div>
 
-                          {/* 底部 footer */}
+                          {/* 底部 footer — 只放按钮,版本号移到 banner */}
                           <div
                             style={{
-                              padding: "8px 12px",
+                              padding: "10px 12px",
                               borderTop: "1px solid var(--ant-color-border-secondary)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
                               background: "var(--ant-color-bg-layout)",
                             }}
                           >
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontFamily: "var(--mono-font)",
-                                color: "var(--ant-color-text-tertiary)",
-                              }}
-                              title={`插件 id: ${it.entry.id}`}
-                            >
-                              v
-                              {it.isUpdate
-                                ? `${it.localVersion} → ${it.entry.version}`
-                                : it.entry.version}
-                            </span>
                             <button
                               disabled={installing === it.key || (it.installed && !it.isUpdate)}
                               onClick={() => handleInstall(g.source, it.entry, it.key)}
                               style={{
-                                padding: "4px 14px",
+                                display: "block",
+                                width: "100%",
+                                padding: "6px 0",
                                 background:
                                   installing === it.key
                                     ? "var(--ant-color-fill-secondary)"
@@ -1426,8 +1441,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                                     : it.installed && !it.isUpdate
                                     ? "not-allowed"
                                     : "pointer",
-                                fontSize: 12,
-                                fontWeight: it.installed && !it.isUpdate ? 600 : 500,
+                                fontSize: 13,
+                                fontWeight: 600,
                                 boxShadow: installing
                                   ? "none"
                                   : it.installed && !it.isUpdate
