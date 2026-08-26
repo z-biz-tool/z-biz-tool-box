@@ -21,6 +21,7 @@ pub fn run() {
             plugin_engine::http_request,
             get_state,
             apply_window_prefs,
+            uninstall_plugin,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
@@ -120,6 +121,32 @@ fn apply_window_prefs(app: tauri::AppHandle, prefs: WindowPrefs) -> Result<(), S
             prefs.always_on_top
         );
     }
+    Ok(())
+}
+
+/// 卸载外部插件: 递归删除 ~/.z-biz-tools/plugins/{id}/
+/// - id 严格校验 (防路径穿越: 只允许 [a-zA-Z0-9._-]+)
+/// - 用 std::fs::remove_dir_all 走 Rust 端, 避免 shell 权限问题
+/// - 失败抛错到前端(UI 弹 message.error)
+#[tauri::command]
+fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if id.is_empty()
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+    {
+        return Err(format!("非法 plugin id: {id:?}"));
+    }
+    let home = app
+        .path()
+        .home_dir()
+        .map_err(|e| format!("home_dir 失败: {e}"))?;
+    let dir = home.join(".z-biz-tools").join("plugins").join(&id);
+    if !dir.exists() {
+        return Err(format!("插件目录不存在: {}", dir.display()));
+    }
+    std::fs::remove_dir_all(&dir).map_err(|e| format!("删除失败: {e}"))?;
+    eprintln!("[z-biz] uninstalled plugin: {id} (path={})", dir.display());
     Ok(())
 }
 

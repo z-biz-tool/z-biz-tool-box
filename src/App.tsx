@@ -224,6 +224,7 @@ export default function App() {
             onClose={hideWindow}
             onBack={() => setActiveKey("spotlight")}
             onOpenMarketSources={() => setSourceMgrOpen(true)}
+            onSelectTool={(key) => setActiveKey(key)}
           />
         ) : active.kind === "preferences" ? (
           <PreferencesView onBack={() => setActiveKey("spotlight")} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Badge, message } from "antd";
+import { Input, Badge, message, Popconfirm, Typography } from "antd";
 import {
   SearchOutlined,
   ArrowLeftOutlined,
@@ -12,10 +12,11 @@ import {
   RocketOutlined,
   CheckCircleOutlined,
   WifiOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { TOOL_GROUPS } from "../plugins/_registry";
 import { useExtStore } from "../plugins/external/store";
-import { openPluginsDir } from "../plugins/external/scanner";
+import { openPluginsDir, uninstallLocalPlugin } from "../plugins/external/scanner";
 import { useUiStore } from "../stores/uiStore";
 import { DragHandle } from "./DragHandle";
 import { isNewer } from "../plugins/external/market";
@@ -26,6 +27,8 @@ interface MarketViewProps {
   onClose: () => void;
   onBack: () => void;
   onOpenMarketSources: () => void;
+  /** 点击左列已装工具 — 切到 ToolView */
+  onSelectTool: (key: string) => void;
 }
 
 /**
@@ -40,14 +43,16 @@ interface MarketViewProps {
  *  - "按源分组的远程插件" (右列) = 所有 enabled 源 cachedList.plugins,
  *    按源分组, 每个插件标注"未装" / "已装" / "有新版本"
  */
-export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewProps) {
+export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool }: MarketViewProps) {
   const [query, setQuery] = useState("");
+  const [rightTab, setRightTab] = useState<"installed" | "remote">("remote");
   const [installing, setInstalling] = useState<string | null>(null);
   const inputRef = useRef<any>(null);
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
   const marketSources = useUiStore((s) => s.marketSources);
+  const disabled = useUiStore((s) => s.disabled);
   const healthySources = marketSources.filter(
     (s) => s.enabled && s.cachedList && !s.lastError
   ).length;
@@ -59,7 +64,14 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
 
   // 已安装列表: builtin + 外部
   const installed = useMemo(() => {
-    const items: Array<{ key: string; name: string; desc: string; icon: React.ReactNode; isExternal: boolean }> = [];
+    const items: Array<{
+      key: string;
+      name: string;
+      desc: string;
+      icon: React.ReactNode;
+      isExternal: boolean;
+      pluginId?: string; // external 才有,用于卸载
+    }> = [];
     for (const g of TOOL_GROUPS) {
       for (const t of g.tools) {
         items.push({
@@ -79,6 +91,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
           desc: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
           icon: p.logoUrl ? <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} /> : <AppstoreOutlined />,
           isExternal: true,
+          pluginId: p.id, // 卸载时用 — 删整个插件目录
         });
       }
     }
@@ -373,6 +386,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
               {filteredInstalled.slice(0, 50).map((it) => (
                 <div
                   key={it.key}
+                  data-no-drag
+                  onClick={() => onSelectTool(it.key)}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -381,7 +396,15 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                     borderRadius: 6,
                     fontSize: 12,
                     color: "var(--ant-color-text)",
-                    cursor: "default",
+                    cursor: "pointer",
+                    transition: "background 0.12s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "var(--ant-color-fill-tertiary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
                   }}
                 >
                   <span style={{ display: "inline-flex", width: 14, color: "var(--ant-color-text-tertiary)" }}>
@@ -400,25 +423,200 @@ export function MarketView({ onClose, onBack, onOpenMarketSources }: MarketViewP
                   {it.isExternal && (
                     <span style={{ fontSize: 10, color: "#722ed1" }}>📦</span>
                   )}
+                  {it.isExternal && it.pluginId && (
+                    <Popconfirm
+                      title="卸载该外部插件?"
+                      description="会从 ~/.z-biz-tools/plugins/ 物理删除"
+                      okText="卸载"
+                      cancelText="取消"
+                      okType="danger"
+                      onConfirm={async (e) => {
+                        e?.stopPropagation();
+                        try {
+                          await uninstallLocalPlugin(it.pluginId!);
+                          message.success(`已卸载 ${it.name}`);
+                        } catch (err) {
+                          message.error(`卸载失败: ${String(err)}`);
+                        }
+                      }}
+                      onCancel={(e) => e?.stopPropagation()}
+                    >
+                      <button
+                        data-no-drag
+                        title="卸载"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          background: "transparent",
+                          border: 0,
+                          color: "var(--ant-color-text-tertiary)",
+                          cursor: "pointer",
+                          padding: "0 4px",
+                          fontSize: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          borderRadius: 3,
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.color = "#ff4d4f";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--ant-color-text-tertiary)";
+                        }}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </Popconfirm>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* 主区: 按源分组的远程插件列表 */}
+        {/* 主区: tab 切换 [已装 / 远程] */}
         <div style={{ flex: 1, overflowY: "auto", background: "var(--ant-color-bg-layout)" }}>
+          {/* tab 切换条 */}
+          <div
+            data-no-drag
+            style={{
+              padding: "12px 24px 8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              borderBottom: "1px solid var(--ant-color-border-secondary)",
+            }}
+          >
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => setRightTab("installed")}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: 12,
+                  background: rightTab === "installed" ? "var(--ant-color-primary)" : "transparent",
+                  color: rightTab === "installed" ? "white" : "var(--ant-color-text)",
+                  border: 0,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                📦 已装 ({installed.length})
+              </button>
+              <button
+                onClick={() => setRightTab("remote")}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: 12,
+                  background: rightTab === "remote" ? "var(--ant-color-primary)" : "transparent",
+                  color: rightTab === "remote" ? "white" : "var(--ant-color-text)",
+                  border: 0,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                🌐 远程 ({marketGroups.reduce((s, g) => s + g.plugins.length, 0)})
+              </button>
+            </div>
+            {rightTab === "remote" && marketGroups.length > 0 && (
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                {marketSources.filter((s) => s.enabled).length} 个源 ·{" "}
+                {marketGroups.reduce((s, g) => s + g.plugins.length, 0)} 个可装/可更新
+              </Typography.Text>
+            )}
+          </div>
+
           {query ? (
             <div style={{ padding: 24 }}>
               <div style={{ marginBottom: 12, fontSize: 14, color: "var(--ant-color-text)" }}>
                 搜索 "{query}" 的已装插件 ({filteredInstalled.length})
               </div>
             </div>
+          ) : rightTab === "installed" ? (
+            // 已装 tab — 按组展示
+            <div style={{ padding: "16px 24px 32px" }}>
+              {TOOL_GROUPS.map((g) => {
+                const groupTools = g.tools.filter((t) => !disabled.includes(t.key));
+                if (groupTools.length === 0) return null;
+                return (
+                  <div key={g.key} style={{ marginBottom: 24 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        marginBottom: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {g.icon}
+                      <span>{g.label}</span>
+                      <span style={{ color: "var(--ant-color-text-tertiary)", fontWeight: 400 }}>
+                        ({groupTools.length})
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      {groupTools.map((t) => (
+                        <div
+                          key={t.key}
+                          data-no-drag
+                          onClick={() => onSelectTool(t.key)}
+                          style={{
+                            background: "var(--ant-color-bg-container)",
+                            border: "1px solid var(--ant-color-border-secondary)",
+                            borderRadius: 8,
+                            padding: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            cursor: "pointer",
+                            transition: "all 0.16s",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor =
+                              "var(--ant-color-primary)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor =
+                              "var(--ant-color-border-secondary)";
+                          }}
+                        >
+                          <span style={{ fontSize: 14, color: "var(--ant-color-primary)" }}>
+                            {t.icon}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              flex: 1,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {t.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : marketGroups.length === 0 ? (
-            // 空状态: 没源 或 源都是空的
+            // 远程 tab 但无源 — 引导
             <div
               style={{
-                height: "100%",
+                height: "calc(100% - 60px)",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
