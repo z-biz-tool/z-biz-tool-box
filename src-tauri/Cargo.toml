@@ -1,6 +1,5 @@
 [package]
-name = "z-biz-tool-box"
-version = "0.1.0"
+name = "z-biz-tool-box"version = "0.2.0"
 description = "插件化工具箱"
 edition = "2021"
 
