@@ -24,6 +24,9 @@ import { isNewer } from "../plugins/external/market";
 import { installRemotePlugin } from "../plugins/external/installer";
 import type { MarketSource, MarketPluginEntry } from "../plugins/external/types";
 
+// 渐变色定义
+const brandGradient = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+
 interface MarketViewProps {
   onClose: () => void;
   onBack: () => void;
@@ -316,7 +319,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             size="middle"
             data-no-drag
             prefix={
-              <SearchOutlined style={{ fontSize: 16, color: "var(--ant-color-text-tertiary)" }} />
+              <SearchOutlined style={{ fontSize: 16, color: "#667eea" }} />
             }
             placeholder={`搜索 ${installed.length + 4767} 款插件应用...`}
             value={query}
@@ -324,9 +327,19 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             variant="borderless"
             style={{
               fontSize: 15,
-              height: 32,
-              background: "var(--ant-color-fill-tertiary)",
-              borderRadius: 8,
+              height: 36,
+              background: searchBgGradient,
+              borderRadius: 10,
+              border: '1px solid rgba(102,126,234,0.1)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(102,126,234,0.15)';
+              e.currentTarget.style.border = '1px solid rgba(102,126,234,0.3)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.border = '1px solid rgba(102,126,234,0.1)';
             }}
             allowClear
           />
@@ -356,9 +369,19 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             color: "var(--ant-color-text-tertiary)",
             cursor: "pointer",
             fontSize: 14,
-            padding: 6,
+            padding: 8,
+            borderRadius: 8,
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           title="打开插件目录"
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = searchBgGradient;
+            (e.currentTarget as HTMLElement).style.color = "#667eea";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--ant-color-text-tertiary)";
+          }}
         >
           <SettingOutlined />
         </button>
