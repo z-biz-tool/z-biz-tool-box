@@ -1,3 +1,9 @@
+/* ============================================
+   z-biz-tool-box 统一样式导入
+   ============================================ */
+
+@import './shared-style.css';
+
 * {
   margin: 0;
   padding: 0;
@@ -14,13 +20,78 @@ body {
   height: 100vh;
 }
 
-/* MarketView 工具栏图标按钮 — 统一圆角与 hover 反馈
-   (按钮 inline style 带 background/color, hover 需 !important 才能覆盖) */
+/* ============================================
+   z-biz-tool-box 特有样式
+   ============================================ */
+
+/* MarketView 工具栏图标按钮 */
 .mvIconBtn {
-  border-radius: 6px;
-  transition: background 0.12s, color 0.12s;
+  border-radius: var(--tool-radius-md);
+  transition: background var(--tool-transition-fast), color var(--tool-transition-fast);
 }
 .mvIconBtn:hover:not(:disabled) {
-  background: var(--ant-color-fill-secondary) !important;
-  color: var(--ant-color-text) !important;
+  background: var(--tool-bg-hover) !important;
+  color: var(--tool-text-primary) !important;
+}
+
+/* 主容器 */
+.box-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--tool-bg-primary);
+}
+
+.box-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 工具网格 */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--tool-padding-md);
+  padding: var(--tool-padding-lg);
+  overflow-y: auto;
+  height: 100%;
+}
+
+.tool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tool-padding-sm);
+  padding: var(--tool-padding-md);
+  border: 1px solid var(--tool-border-color);
+  border-radius: var(--tool-radius-md);
+  background: var(--tool-bg-primary);
+  cursor: pointer;
+  transition: all var(--tool-transition-fast);
+}
+
+.tool-item:hover {
+  border-color: var(--tool-accent-color);
+  box-shadow: var(--tool-shadow-sm);
+  transform: translateY(-2px);
+}
+
+.tool-item-icon {
+  font-size: 36px;
+  margin-bottom: var(--tool-padding-xs);
+}
+
+.tool-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tool-text-primary);
+  text-align: center;
+}
+
+.tool-item-description {
+  font-size: 12px;
+  color: var(--tool-text-secondary);
+  text-align: center;
+  line-height: 1.5;
 }

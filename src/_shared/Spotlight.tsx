@@ -26,6 +26,7 @@ import {
   hoverBackground,
 } from "./designTokens";
 
+
 interface SpotlightProps {
   onSelect: (key: string) => void;
   onClose: () => void;
@@ -214,7 +215,22 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           variant="borderless"
-          style={{ fontSize: 15, height: 32, fontWeight: 500 }}
+          style={{ 
+            fontSize: 15, 
+            height: 32, 
+            fontWeight: 500,
+            borderRadius: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.boxShadow = '0 2px 12px rgba(102,126,234,0.2)';
+            e.currentTarget.style.border = '1px solid rgba(102,126,234,0.3)';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+            e.currentTarget.style.border = '';
+          }}
           allowClear
         />
       </DragHandle>

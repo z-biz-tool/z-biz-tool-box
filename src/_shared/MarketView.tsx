@@ -25,7 +25,7 @@ import { installRemotePlugin } from "../plugins/external/installer";
 import type { MarketSource, MarketPluginEntry } from "../plugins/external/types";
 
 // 渐变色定义
-const brandGradient = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+const searchBgGradient = "linear-gradient(135deg, rgba(102,126,234,0.06) 0%, rgba(118,75,162,0.06) 100%)";
 
 interface MarketViewProps {
   onClose: () => void;
