@@ -3,6 +3,7 @@ name = "z-biz-tool-box"
 version = "0.3.1"
 description = "插件化工具箱"
 edition = "2021"
+license = "MIT"
 
 [lib]
 name = "z_biz_tool_box_lib"
