@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Input, Button, Space, Tag, Alert, Row, Col } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "cron",
@@ -136,7 +137,7 @@ const EXAMPLES = [
 ];
 
 export default function CronParser() {
-  const [expr, setExpr] = useState("0 9 * * 1-5");
+  const [expr, setExpr] = useToolState("cron", "expr", "0 9 * * 1-5");
   const [result, setResult] = useState(() => getCronDescription("0 9 * * 1-5"));
 
   const parse = (value: string) => {

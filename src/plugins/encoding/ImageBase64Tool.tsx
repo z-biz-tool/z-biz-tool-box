@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input, Button, Space, Card, message, Segmented, Empty, Typography } from "antd";
 import { FileImageOutlined, CopyOutlined, ClearOutlined, UploadOutlined } from "@ant-design/icons";
-import { useCopyToClipboard, useClearAll, usePluginInput, useCommonStyles } from "../../_shared";
+import { useCopyToClipboard, useClearAll, usePluginInput, useCommonStyles, useToolState } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -22,7 +22,7 @@ type Mode = "encode" | "decode";
  */
 export default function ImageBase64Tool() {
   const s = useCommonStyles();
-  const [mode, setMode] = useState<Mode>("decode");
+  const [mode, setMode] = useToolState<Mode>("image-base64", "mode", "decode");
   const [input, setInput] = usePluginInput("image-base64");
   const [dataUrl, setDataUrl] = useState("");
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);

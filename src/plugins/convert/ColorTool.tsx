@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, Input, Row, Col, Space, Tag, message, ColorPicker } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "color",
@@ -111,7 +112,7 @@ const PRESETS = [
 ];
 
 export default function ColorTool() {
-  const [hex, setHex] = useState("#1890ff");
+  const [hex, setHex] = useToolState("color", "hex", "#1890ff");
   const [rgb, setRgb] = useState<RGB>({ r: 24, g: 144, b: 255 });
   const [hsl, setHsl] = useState<HSL>({ h: 211, s: 100, l: 55 });
 

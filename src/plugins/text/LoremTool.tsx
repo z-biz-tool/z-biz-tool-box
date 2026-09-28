@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, InputNumber, Button, Space, Input, Select, Row, Col, message } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "lorem",
@@ -109,10 +110,10 @@ function randomParagraph(minSentences = 3, maxSentences = 6): string {
 type Unit = "paragraph" | "sentence" | "word";
 
 export default function LoremTool() {
-  const [count, setCount] = useState(3);
-  const [unit, setUnit] = useState<Unit>("paragraph");
+  const [count, setCount] = useToolState("lorem", "count", 3);
+  const [unit, setUnit] = useToolState<Unit>("lorem", "unit", "paragraph");
   const [output, setOutput] = useState("");
-  const [startWithLorem, setStartWithLorem] = useState(true);
+  const [startWithLorem, setStartWithLorem] = useToolState("lorem", "startWithLorem", true);
 
   const generate = () => {
     let parts: string[] = [];

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Select, Tag, Row, Col, Statistic } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "hash",
@@ -20,8 +21,8 @@ const ALGORITHMS = [
 ];
 
 export default function HashTool() {
-  const [input, setInput] = useState("");
-  const [algo, setAlgo] = useState("sha-256");
+  const [input, setInput] = useToolState("hash", "input", "");
+  const [algo, setAlgo] = useToolState("hash", "algo", "sha-256");
   const [results, setResults] = useState<Record<string, string>>({});
 
   const computeHash = async (algorithm: string, text: string): Promise<string> => {

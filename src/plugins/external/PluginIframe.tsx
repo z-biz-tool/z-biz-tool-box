@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { ReloadOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { buildZbizApi } from "./api";
+import {
+  createBudget,
+  dispatchBridgeMethod,
+  HOST_REPLY_TARGET_ORIGIN,
+  parseHello,
+  parseRpc,
+  PLUGIN_SANDBOX,
+  readyMessage,
+  responseMessage,
+  type BridgeMessage,
+} from "./bridge-protocol";
 import { openPluginsDir } from "./scanner";
 import type { ExternalPlugin } from "./types";
 
@@ -10,15 +21,18 @@ interface PluginIframeProps {
 }
 
 /**
- * 渲染外部插件 — 通过 iframe 沙箱加载,主应用注入 zBiz API。
+ * 渲染外部插件 — iframe 沙箱加载, 能力只经 zBiz 桥接协议给出。
  *
- * 注入策略(iframe 经 asset://localhost 加载本地 main.html, 与宿主跨源):
- *   - 同源(浏览器直开调试)时 onLoad 直接设置 contentWindow.zBiz
- *   - 跨源(客户端内, 常态)时走 postMessage 桥接:
- *       插件 bootstrap 发 {__zbiz_hello} → 宿主回 {__zbiz_ready, pluginId}
- *       插件按 {__zbiz, id, method, args} 发起 RPC → 宿主回 {__zbiz_rsp, id, result|error}
- *   - 插件内代码 window.zBiz.copyToClipboard(...) 即可调用(两种方式对插件透明)
- *   - 任何 plugin 出错显示在 iframe 下方
+ * 沙箱: PLUGIN_SANDBOX 刻意不含 allow-same-origin。
+ * 之前 `allow-scripts + allow-same-origin` 让插件文档保留 asset:// 这个特权源:
+ * 既能在 scope($HOME/.z-biz-tools/**) 内任意读别人的插件/数据文件, 又和宿主共享
+ * WebView 的 IPC 注入面; 而旧桥接用 `method.split(".").reduce(...)` 取值,
+ * 一条 `{method:"constructor.constructor", args:["return this"]}` 就能拿到宿主
+ * window(含 __TAURI_INTERNALS__) → 任意 fs/shell。
+ * 现在: 文档为不透明源 + 协议白名单(见 bridge-protocol.ts), 两条路都堵死。
+ *
+ * 插件侧用法不变: window.zBiz.copyToClipboard(...) 由插件自身 bootstrap 建立,
+ * 出错显示在 iframe 上方。
  */
 export function PluginIframe({ plugin }: PluginIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -29,59 +43,42 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
     const iframe = iframeRef.current;
     if (!iframe) return;
     const api = buildZbizApi(plugin.id);
-    const post = (msg: unknown) => {
+    const takeToken = createBudget();
+    const post = (msg: BridgeMessage) => {
       try {
-        iframe.contentWindow?.postMessage(msg, "*");
+        iframe.contentWindow?.postMessage(msg, HOST_REPLY_TARGET_ORIGIN);
       } catch {
         /* iframe 可能已卸载, 忽略 */
       }
     };
 
-    // postMessage 桥接: iframe 经 asset://localhost 加载, 与宿主跨源,
-    // contentWindow.zBiz 直注会抛 SecurityError, 由插件内 bootstrap 发起 RPC
     const onMessage = (ev: MessageEvent) => {
+      // 不透明源下 ev.origin 恒为 "null", 只有窗口句柄能把消息绑定到这个 frame
       if (ev.source !== iframe.contentWindow) return;
-      const d = ev.data as Record<string, unknown> | null | undefined;
-      if (!d || typeof d !== "object") return;
-      if (d.__zbiz_hello) {
-        post({ __zbiz_ready: 1, pluginId: plugin.id });
+      if (parseHello(ev.data)) {
+        post(readyMessage(plugin.id));
         return;
       }
-      const id = d.id as string | undefined;
-      const method = d.method as string | undefined;
-      const args = d.args as unknown[] | undefined;
-      if (!d.__zbiz || !id || !method) return;
-      const respond = (result: unknown, error?: unknown) =>
-        post({ __zbiz_rsp: 1, id, result, error: error === undefined ? undefined : String(error) });
+      const rpc = parseRpc(ev.data);
+      if (!rpc) return; // 非法包: 静默丢弃, 不调用任何能力
+      if (!takeToken()) {
+        post(responseMessage(rpc.id, undefined, "zBiz 桥接: 调用过于频繁"));
+        return;
+      }
       Promise.resolve()
-        .then(() => {
-          const fn = method.split(".").reduce<unknown>(
-            (o, k) => (o as Record<string, unknown> | undefined)?.[k],
-            api
-          );
-          if (typeof fn !== "function") throw new Error(`zBiz 桥接: 未知方法 "${method}"`);
-          return (fn as (...a: unknown[]) => unknown)(...(args ?? []));
-        })
-        .then((r) => respond(r))
-        .catch((e) => respond(undefined, e));
+        .then(() => dispatchBridgeMethod(api, rpc.method, rpc.args))
+        .then((result) => post(responseMessage(rpc.id, result)))
+        .catch((e) => post(responseMessage(rpc.id, undefined, e instanceof Error ? e.message : String(e))));
     };
     window.addEventListener("message", onMessage);
 
+    // 插件的 hello 若早于 load 送达, 这里再推一次 ready 兜底(插件侧 install 幂等)
     const onLoad = () => {
-      // 同源(浏览器直开调试)时直注; 跨源抛 SecurityError 由桥接兜底, 不视为错误
-      try {
-        const w = iframe.contentWindow;
-        if (!w) {
-          setError("iframe.contentWindow 不可访问");
-          return;
-        }
-        (w as unknown as { zBiz: unknown }).zBiz = api;
-        console.log(`[PluginIframe] injected zBiz for ${plugin.id}`);
-      } catch {
-        /* 跨源: 走 postMessage 桥接 */
+      if (!iframe.contentWindow) {
+        setError("iframe.contentWindow 不可访问");
+        return;
       }
-      // bootstrap 的 hello 若早于 load 送达已被应答, 这里再推一次 ready 兜底(插件侧幂等)
-      post({ __zbiz_ready: 1, pluginId: plugin.id });
+      post(readyMessage(plugin.id));
     };
     iframe.addEventListener("load", onLoad);
     return () => {
@@ -159,7 +156,7 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
           border: "none",
           background: "var(--ant-color-bg-layout)",
         }}
-        sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
+        sandbox={PLUGIN_SANDBOX}
       />
     </div>
   );

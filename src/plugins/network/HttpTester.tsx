@@ -14,6 +14,7 @@ import {
 } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "http",
@@ -40,12 +41,12 @@ interface Response {
 }
 
 export default function HttpTester() {
-  const [method, setMethod] = useState("GET");
-  const [url, setUrl] = useState("https://httpbin.org/get");
-  const [headers, setHeaders] = useState<Header[]>([
+  const [method, setMethod] = useToolState("http", "method", "GET");
+  const [url, setUrl] = useToolState("http", "url", "https://httpbin.org/get");
+  const [headers, setHeaders] = useToolState<Header[]>("http", "headers", [
     { key: "Content-Type", value: "application/json" },
   ]);
-  const [body, setBody] = useState("");
+  const [body, setBody] = useToolState("http", "body", "");
   const [response, setResponse] = useState<Response | null>(null);
   const [loading, setLoading] = useState(false);
 

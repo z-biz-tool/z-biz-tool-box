@@ -30,7 +30,7 @@ import {
   ClearOutlined,
   LinkOutlined,
 } from "@ant-design/icons";
-import { MONO_FONT } from "../../_shared";
+import { MONO_FONT, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 
 export const meta: PluginMeta = {
@@ -52,11 +52,11 @@ export const meta: PluginMeta = {
 
 // ================== 主组件 ==================
 export default function JsonTool() {
-  const [input, setInput] = useState(
+  const [input, setInput] = useToolState("json", "input", 
     '{\n  "name": "z-biz-tool-box",\n  "version": "0.1.0",\n  "tags": ["tool", "productivity"],\n  "stats": { "stars": 12, "forks": 3 },\n  "users": [\n    { "id": 1, "name": "alice", "active": true },\n    { "id": 2, "name": "bob", "active": false }\n  ]\n}',
   );
-  const [indent, setIndent] = useState<number>(2);
-  const [sortKeys, setSortKeys] = useState<boolean>(false);
+  const [indent, setIndent] = useToolState<number>("json", "indent", 2);
+  const [sortKeys, setSortKeys] = useToolState<boolean>("json", "sortKeys", false);
   const [msgApi, msgContext] = message.useMessage();
 
   const safeParse = useCallback((text: string): { ok: true; value: unknown } | { ok: false; error: string } => {

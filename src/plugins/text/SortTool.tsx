@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "sort",
@@ -14,9 +15,9 @@ export const meta: PluginMeta = {
 type Mode = "asc" | "desc" | "shuffle" | "reverse" | "natural";
 
 export default function SortTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useToolState("sort", "input", "");
   const [output, setOutput] = useState("");
-  const [mode, setMode] = useState<Mode>("asc");
+  const [mode, setMode] = useToolState<Mode>("sort", "mode", "asc");
 
   const sort = () => {
     const lines = input.split("\n");

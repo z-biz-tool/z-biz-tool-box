@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import {
   Input,
   Button,
@@ -19,7 +19,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
 } from "@ant-design/icons";
-import { MONO_FONT } from "../../_shared";
+import { MONO_FONT, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 
 export const meta: PluginMeta = {
@@ -55,12 +55,12 @@ const GROUP_COLORS = [
 ];
 
 export default function RegexTester() {
-  const [pattern, setPattern] = useState("\\b\\w+@\\w+\\.\\w+\\b");
-  const [flags, setFlags] = useState("g");
-  const [testString, setTestString] = useState(
+  const [pattern, setPattern] = useToolState("regex", "pattern", "\\b\\w+@\\w+\\.\\w+\\b");
+  const [flags, setFlags] = useToolState("regex", "flags", "g");
+  const [testString, setTestString] = useToolState("regex", "testString", 
     "联系我们：support@example.com 或 sales@test.org\n客服电话：13800138000\n官网：https://www.example.com"
   );
-  const [showGroups, setShowGroups] = useState(true);
+  const [showGroups, setShowGroups] = useToolState("regex", "showGroups", true);
   const [msgApi, msgContext] = message.useMessage();
 
   // 解析正则表达式

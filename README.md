@@ -13,7 +13,7 @@
 
 ## 概览
 
-**27 个内置工具**，覆盖**编码 / 文本 / 加密 / 转换 / 网络 / 系统** 6 大类。核心定位是一个**轻量插件化工具箱**：应用本身只是壳，所有能力通过单一注册点动态加载，新增工具只需写一个文件、零代码侵入。
+**31 个内置工具**，覆盖**编码 / 文本 / 加密 / 转换 / 网络 / 系统** 6 大类。核心定位是一个**轻量插件化工具箱**：应用本身只是壳，所有能力通过单一注册点动态加载，新增工具只需写一个文件、零代码侵入。
 
 - 绝大部分工具**纯前端实现**（Web Crypto API / 原生 JS），无后端依赖
 - Rust 仅承担一个真正有性能优势的命令 —— `http_request`（30s timeout + 强制忽略证书验证，浏览器 fetch 做不到）
@@ -45,16 +45,18 @@
 
 ---
 
-## 内置工具（27 个）
+## 内置工具（31 个）
 
 | 分组 | 工具 |
 |------|------|
-| **编码** | Base64 编解码 / URL 编解码 / HTML 实体转换 / Hex 转换 / 哈希（MD5/SHA-1/SHA-256/SHA-512） |
-| **文本** | JSON 格式化（压缩/美化/校验）/ Diff 文本对比 / 大小写转换 / 文本去重 / 文本排序 / 字数统计 / 文本翻转 / Lorem Ipsum 生成 |
-| **加密** | JWT 解码 / 密码生成（可定制长度/字符集）/ 密码强度评估 / UUID 生成 |
-| **转换** | 颜色（HEX/RGB/HSL 互转）/ 进制（2/8/10/16 互转）/ 单位（长度/重量/温度/面积）/ 汇率（实时拉取）/ Cron 解析 / Unix 时间戳 |
-| **网络** | HTTP 测试（Rust reqwest，30s timeout + 禁证书校验）/ IP 子网计算 |
-| **系统** | 剪贴板（自动监听 + 置顶 + 搜索历史）/ 插件市场（启用/禁用工具） |
+| **编码**（6） | Base64 / URL 编解码 / HTML 实体 / Hex 编解码 / 哈希计算 / 图片 Base64 |
+| **文本**（9） | JSON 工具 / 文本对比 / 大小写转换 / 文本去重 / 文本排序 / 字数统计 / 文本翻转 / Lorem 生成 / 正则测试器 |
+| **加密**（4） | JWT 解码 / 密码生成 / 密码强度 / UUID 生成 |
+| **转换**（7） | 颜色转换 / 进制转换 / 单位换算 / 汇率换算 / Cron 解析 / 时间戳 / 屏幕标尺 |
+| **网络**（2） | HTTP 测试（Rust reqwest，30s timeout + 禁证书校验）/ IP 工具 |
+| **系统**（3） | 剪贴板（自动监听 + 置顶 + 搜索历史）/ 插件市场（启用/禁用工具）/ 截图工具 |
+
+> 数字来自 `src/plugins/_registry.tsx` 的自动收集结果（按目录分组），不是手工维护的常量。
 
 ---
 
@@ -246,10 +248,13 @@ export const meta: PluginMeta = {
 
 #### 安全模型
 
-- iframe `sandbox="allow-scripts allow-forms allow-same-origin allow-popups"`
-- 没有 `allow-same-origin` 则无法访问主应用 API（zBiz 注入失败）
+- iframe `sandbox="allow-scripts allow-forms allow-modals allow-popups"` — **刻意不给 `allow-same-origin`**，
+  插件文档因此处于不透明源（opaque origin）：读不到主应用的 cookie/localStorage，也拿不到 `asset://` 文件域
 - 没有 `allow-top-navigation`，插件无法跳转主页面
-- 插件的 zBiz API 是主应用主动注入的，不是浏览器自身能力
+- 插件调用宿主能力只经 `postMessage` RPC（协议集中在 `src/plugins/external/bridge-protocol.ts`）：
+  方法必须命中显式白名单，宿主按 `event.source === iframe.contentWindow` 认人，并有深度/体积/频次限制
+- `zBiz.invoke` 仅放行 `http_request`；原型链取值（`constructor.constructor` 一类）在解析阶段即被拒绝
+- 自检：`npm run check:bridge`（断言沙箱属性 + 伪造包被拒）
 
 #### 调试流程
 
@@ -263,7 +268,7 @@ export const meta: PluginMeta = {
 ## 路线图
 
 - [x] 动态外部插件加载（utools 风格，plugin.json + iframe 沙箱 + zBiz API）
-- [ ] 26 个未接入 `usePluginInput` 的工具逐个迁移
+- [x] 工具输入持久化：24 个工具经 `useToolState` 接入（口令/剪贴板内容按设计不落盘）
 - [ ] 设计 token 化：收敛 80+ 处内联 style
 - [ ] 国际化（i18n）
 - [ ] 插件 preload.js 机制（在 zBiz 注入前执行）

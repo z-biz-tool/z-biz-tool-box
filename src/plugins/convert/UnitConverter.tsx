@@ -1,6 +1,7 @@
-import { useState } from "react";
+
 import { Card, Select, InputNumber, Row, Col, Statistic, Space, message } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "unit",
@@ -129,10 +130,10 @@ function convert(value: number, from: string, to: string, category: Category): n
 }
 
 export default function UnitConverter() {
-  const [category, setCategory] = useState<Category>("length");
-  const [value, setValue] = useState(1);
-  const [fromUnit, setFromUnit] = useState("m");
-  const [toUnit, setToUnit] = useState("ft");
+  const [category, setCategory] = useToolState<Category>("unit", "category", "length");
+  const [value, setValue] = useToolState("unit", "value", 1);
+  const [fromUnit, setFromUnit] = useToolState("unit", "fromUnit", "m");
+  const [toUnit, setToUnit] = useToolState("unit", "toUnit", "ft");
 
   const handleCategoryChange = (cat: Category) => {
     setCategory(cat);

@@ -15,6 +15,7 @@ import {
 } from "antd";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "clipboard",
@@ -35,9 +36,9 @@ interface ClipItem {
 export default function ClipboardTool() {
   const [history, setHistory] = useState<ClipItem[]>([]);
   const [current, setCurrent] = useState("");
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useToolState("clipboard", "filter", "");
   const [lastClip, setLastClip] = useState("");
-  const [autoWatch, setAutoWatch] = useState(false);
+  const [autoWatch, setAutoWatch] = useToolState("clipboard", "autoWatch", false);
 
   // 读取当前剪贴板
   const readClipboard = useCallback(async () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, Select, InputNumber, Row, Col, Statistic, Space, Tag, Alert, message } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "exchange",
@@ -59,9 +60,9 @@ const OFFLINE_RATES: Record<string, number> = {
 };
 
 export default function ExchangeRate() {
-  const [from, setFrom] = useState("USD");
-  const [to, setTo] = useState("CNY");
-  const [amount, setAmount] = useState(100);
+  const [from, setFrom] = useToolState("exchange", "from", "USD");
+  const [to, setTo] = useToolState("exchange", "to", "CNY");
+  const [amount, setAmount] = useToolState("exchange", "amount", 100);
   const [rates, setRates] = useState<Record<string, number>>(OFFLINE_RATES);
   const [source, setSource] = useState<"offline" | "online">("offline");
   const [loading, setLoading] = useState(false);

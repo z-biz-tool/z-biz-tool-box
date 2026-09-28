@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Input, Row, Col, Tag, Space, Radio, message } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "numberbase",
@@ -21,7 +22,7 @@ const BASE_INFO: Record<Base, { radix: number; label: string; color: string }> =
 };
 
 export default function NumberBaseTool() {
-  const [values, setValues] = useState<Record<Base, string>>({
+  const [values, setValues] = useToolState<Record<Base, string>>("numberbase", "values", {
     bin: "",
     oct: "",
     dec: "0",

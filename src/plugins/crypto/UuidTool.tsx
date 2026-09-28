@@ -12,6 +12,7 @@ import {
   Typography,
 } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "uuid",
@@ -24,10 +25,10 @@ export const meta: PluginMeta = {
 
 export default function UuidTool() {
   const [uuid, setUuid] = useState("");
-  const [count, setCount] = useState(1);
-  const [version, setVersion] = useState<"v4" | "nil">("v4");
-  const [uppercase, setUppercase] = useState(false);
-  const [hyphens, setHyphens] = useState(true);
+  const [count, setCount] = useToolState("uuid", "count", 1);
+  const [version, setVersion] = useToolState<"v4" | "nil">("uuid", "version", "v4");
+  const [uppercase, setUppercase] = useToolState("uuid", "uppercase", false);
+  const [hyphens, setHyphens] = useToolState("uuid", "hyphens", true);
   const [history, setHistory] = useState<string[]>([]);
 
   const generateV4 = (): string => {

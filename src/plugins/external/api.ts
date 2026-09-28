@@ -9,6 +9,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writeText as clipboardWrite } from "@tauri-apps/plugin-clipboard-manager";
 import { message } from "antd";
+import { ALLOWED_INVOKE_COMMANDS } from "./bridge-protocol";
 
 export interface ZBizApi {
   /** 复制文本到系统剪贴板 */
@@ -17,8 +18,8 @@ export interface ZBizApi {
   readClipboard: () => Promise<{ ok: boolean; text?: string; error?: string }>;
   /** 显示通知(主应用级别 toast) */
   notify: (msg: string) => void;
-  /** 调用 Tauri 后端命令(白名单制:仅 http_request) */
-  invoke: (cmd: "http_request", args: Record<string, unknown>) => Promise<unknown>;
+  /** 调用 Tauri 后端命令(cmd 为任意字符串, 由下方白名单判定; 名单外直接抛错) */
+  invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
   /** 简单 KV 存储(plugin-scoped,key 前缀自动加 plugin id) */
   storage: {
     get: (key: string) => Promise<string | null>;
@@ -36,11 +37,28 @@ export interface ZBizApi {
 }
 
 const STORAGE_PREFIX = "zBiz.plugin.";
+/** 转发的 Tauri 命令白名单(与协议层共用同一份) */
+const INVOKE_ALLOWLIST = new Set<string>(ALLOWED_INVOKE_COMMANDS);
+const STORAGE_MAX_KEY_LEN = 128;
+const STORAGE_MAX_BYTES = 256 * 1024;
+
+const byteLen = (v: unknown): number => {
+  try {
+    return JSON.stringify(v)?.length ?? 0;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+};
 
 export function buildZbizApi(pluginId: string): ZBizApi {
-  const storageKey = (k: string) => `${STORAGE_PREFIX}${pluginId}.${k}`;
+  const storageKey = (k: string) => {
+    if (typeof k !== "string" || !k || k.length > STORAGE_MAX_KEY_LEN || k.includes("\u0000")) {
+      throw new Error(`zBiz.storage: 非法 key "${String(k).slice(0, 32)}"`);
+    }
+    return `${STORAGE_PREFIX}${pluginId}.${k}`;
+  };
 
-  return {
+  const api: ZBizApi = {
     pluginId,
     copyToClipboard: async (text) => {
       try {
@@ -68,16 +86,40 @@ export function buildZbizApi(pluginId: string): ZBizApi {
       }
     },
     invoke: async (cmd, args) => {
-      // 白名单:只允许 http_request (实际安全考虑可以加更多)
-      if (cmd !== "http_request") {
+      if (!INVOKE_ALLOWLIST.has(cmd)) {
         throw new Error(`zBiz.invoke: cmd "${cmd}" 不在白名单`);
       }
-      return await invoke(cmd, args);
+      if (byteLen(args) > STORAGE_MAX_BYTES) {
+        throw new Error("zBiz.invoke: args 超出体积上限");
+      }
+      return await invoke(cmd, { ...args });
     },
     storage: {
-      get: async (key) => localStorage.getItem(storageKey(key)),
-      set: async (key, value) => localStorage.setItem(storageKey(key), value),
-      remove: async (key) => localStorage.removeItem(storageKey(key)),
+      get: async (key) => {
+        try {
+          return localStorage.getItem(storageKey(key));
+        } catch (e) {
+          throw new Error(`zBiz.storage.get: ${String(e)}`);
+        }
+      },
+      set: async (key, value) => {
+        if (byteLen(value) > STORAGE_MAX_BYTES) {
+          throw new Error("zBiz.storage.set: value 超出体积上限");
+        }
+        try {
+          localStorage.setItem(storageKey(key), value);
+        } catch (e) {
+          // 配额打满属于用户侧问题, 明确报错而不是静默丢数据
+          throw new Error(`zBiz.storage.set 写入失败(可能存储空间已满): ${String(e)}`);
+        }
+      },
+      remove: async (key) => {
+        try {
+          localStorage.removeItem(storageKey(key));
+        } catch (e) {
+          throw new Error(`zBiz.storage.remove: ${String(e)}`);
+        }
+      },
     },
     hideMainWindow: async () => {
       try {
@@ -98,4 +140,6 @@ export function buildZbizApi(pluginId: string): ZBizApi {
     },
     log: (...args) => console.log(`[${pluginId}]`, ...args),
   };
+  // 冻结: 桥接每次拿到的都是只读快照, 避免运行期被替换实现
+  return Object.freeze({ ...api, storage: Object.freeze(api.storage) });
 }

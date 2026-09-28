@@ -18,6 +18,7 @@ import utc from "dayjs/plugin/utc";
 import dayOfYear from "dayjs/plugin/dayOfYear";
 import isLeapYear from "dayjs/plugin/isLeapYear";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "timestamp",
@@ -53,10 +54,10 @@ const TIMEZONES = [
 ];
 
 export default function TimestampTool() {
-  const [mode, setMode] = useState<Mode>("ts2date");
-  const [unit, setUnit] = useState<Unit>("s");
-  const [timezone, setTimezone] = useState("Asia/Shanghai");
-  const [timestamp, setTimestamp] = useState("");
+  const [mode, setMode] = useToolState<Mode>("timestamp", "mode", "ts2date");
+  const [unit, setUnit] = useToolState<Unit>("timestamp", "unit", "s");
+  const [timezone, setTimezone] = useToolState("timestamp", "timezone", "Asia/Shanghai");
+  const [timestamp, setTimestamp] = useToolState("timestamp", "timestamp", "");
   const [dateStr, setDateStr] = useState<dayjs.Dayjs | null>(null);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const [currentNow, setCurrentNow] = useState("");

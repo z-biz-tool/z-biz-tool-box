@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, Row, Col } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "diff",
@@ -12,8 +13,8 @@ export const meta: PluginMeta = {
 
 
 export default function DiffTool() {
-  const [left, setLeft] = useState("");
-  const [right, setRight] = useState("");
+  const [left, setLeft] = useToolState("diff", "left", "");
+  const [right, setRight] = useToolState("diff", "right", "");
   const [diff, setDiff] = useState<{ type: "add" | "del" | "eq"; text: string }[]>([]);
 
   // 基于 LCS 的行级 diff

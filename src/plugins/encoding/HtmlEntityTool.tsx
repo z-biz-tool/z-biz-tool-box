@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "html-entity",
@@ -48,7 +49,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 };
 
 export default function HtmlEntityTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useToolState("html-entity", "input", "");
   const [output, setOutput] = useState("");
 
   const encode = () => {

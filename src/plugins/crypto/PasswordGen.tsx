@@ -15,6 +15,7 @@ import {
   message,
 } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "pwdgen",
@@ -37,14 +38,14 @@ interface CharSets {
 }
 
 export default function PasswordGen() {
-  const [length, setLength] = useState(16);
-  const [charSets, setCharSets] = useState<CharSets>({
+  const [length, setLength] = useToolState("pwdgen", "length", 16);
+  const [charSets, setCharSets] = useToolState<CharSets>("pwdgen", "charSets", {
     lower: true,
     upper: true,
     number: true,
     symbol: true,
   });
-  const [excludeAmbiguous, setExcludeAmbiguous] = useState(false);
+  const [excludeAmbiguous, setExcludeAmbiguous] = useToolState("pwdgen", "excludeAmbiguous", false);
   const [password, setPassword] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [strength, setStrength] = useState(0);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio, Row, Col } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "reverse",
@@ -14,9 +15,9 @@ export const meta: PluginMeta = {
 type Mode = "chars" | "words" | "lines" | "charsAll";
 
 export default function ReverseTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useToolState("reverse", "input", "");
   const [output, setOutput] = useState("");
-  const [mode, setMode] = useState<Mode>("chars");
+  const [mode, setMode] = useToolState<Mode>("reverse", "mode", "chars");
 
   const reverse = () => {
     switch (mode) {

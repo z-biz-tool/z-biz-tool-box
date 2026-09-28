@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Input, Button, Space, Row, Col, Statistic, Tag, Alert, message } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "ip",
@@ -69,9 +70,9 @@ function isPrivate(ipInt: number): string | null {
 }
 
 export default function IpTool() {
-  const [ip, setIp] = useState("192.168.1.100");
-  const [mask, setMask] = useState("255.255.255.0");
-  const [cidr, setCidr] = useState("24");
+  const [ip, setIp] = useToolState("ip", "ip", "192.168.1.100");
+  const [mask, setMask] = useToolState("ip", "mask", "255.255.255.0");
+  const [cidr, setCidr] = useToolState("ip", "cidr", "24");
   const [result, setResult] = useState<{
     network: string;
     broadcast: string;

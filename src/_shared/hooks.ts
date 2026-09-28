@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { message } from "antd";
 import { useUiStore } from "../stores/uiStore";
 
@@ -70,4 +70,53 @@ export function usePluginInput(pluginKey: string): [string, (v: string) => void]
   );
 
   return [local, setter];
+}
+
+/**
+ * 通用工具状态持久化 — useState 的直接替身, 值以 JSON 落到 uiStore.toolStates。
+ * 切走再切回 / 重载后仍在; 单槽过大时只保留在内存, 不落盘(见 uiStore 的配额处理)。
+ *
+ * 敏感值(口令、剪贴板内容)不要用它持久化。
+ *
+ * @example
+ *   const [mode, setMode] = useToolState("dedup", "mode", "line" as Mode);
+ */
+export function useToolState<T>(
+  toolKey: string,
+  slot: string,
+  initial: T | (() => T)
+): [T, Dispatch<SetStateAction<T>>] {
+  const storageKey = `${toolKey}:${slot}`;
+  const writeSlot = useUiStore((s) => s.setToolState);
+  const [local, setLocal] = useState<T>(() => {
+    const raw = useUiStore.getState().toolStates[storageKey];
+    if (raw !== undefined) {
+      try {
+        return JSON.parse(raw) as T;
+      } catch {
+        /* 历史脏数据: 回落到默认值 */
+      }
+    }
+    return typeof initial === "function" ? (initial as () => T)() : initial;
+  });
+  const latest = useRef(local);
+  latest.current = local;
+
+  const update = useCallback(
+    (v: T | ((prev: T) => T)) => {
+      const next = typeof v === "function" ? (v as (prev: T) => T)(latest.current) : v;
+      latest.current = next;
+      setLocal(next);
+      let raw: string | undefined;
+      try {
+        raw = JSON.stringify(next) ?? "null";
+      } catch {
+        raw = undefined; // 循环引用 / 不可序列化: 不持久化
+      }
+      if (raw !== undefined) writeSlot(storageKey, raw);
+    },
+    [storageKey, writeSlot]
+  );
+
+  return [local, update];
 }

@@ -17,7 +17,7 @@ import {
   FullscreenOutlined,
   AimOutlined,
 } from "@ant-design/icons";
-import { MONO_FONT } from "../../_shared";
+import { MONO_FONT, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 
 export const meta: PluginMeta = {
@@ -58,8 +58,8 @@ export default function ScreenRuler() {
   const [isMeasuring, setIsMeasuring] = useState(false);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
-  const [unit, setUnit] = useState<MeasurementUnit>("px");
-  const [fontSize, setFontSize] = useState(16);
+  const [unit, setUnit] = useToolState<MeasurementUnit>("ruler", "unit", "px");
+  const [fontSize, setFontSize] = useToolState("ruler", "fontSize", 16);
   const [msgApi, msgContext] = message.useMessage();
 
   // 计算测量结果

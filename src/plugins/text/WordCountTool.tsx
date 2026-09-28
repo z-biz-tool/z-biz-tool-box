@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Input, Card, Row, Col, Statistic } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "wordcount",
@@ -12,7 +13,7 @@ export const meta: PluginMeta = {
 
 
 export default function WordCountTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useToolState("wordcount", "input", "");
 
   const stats = useMemo(() => {
     const chars = input.length;

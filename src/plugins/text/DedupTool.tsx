@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio, Statistic, Row, Col } from "antd";
 
+import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "dedup",
@@ -14,9 +15,9 @@ export const meta: PluginMeta = {
 type Mode = "line" | "word" | "trim";
 
 export default function DedupTool() {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useToolState("dedup", "input", "");
   const [output, setOutput] = useState("");
-  const [mode, setMode] = useState<Mode>("line");
+  const [mode, setMode] = useToolState<Mode>("dedup", "mode", "line");
 
   const dedup = () => {
     if (mode === "line") {
