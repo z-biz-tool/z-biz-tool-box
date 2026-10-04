@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window — 2026-10-04 收窄：摘 fs:default（与下面 6 条逐条授权完全重复，但它是整个 fs 插件权限集）、shell:default 收成 shell:allow-open（scanner.ts 只用 open）。scope 维持 $HOME/.z-biz-tools/**，与 paths.ts 里写明的设计一致。",
   "windows": [
     "main"
   ],
@@ -17,7 +17,6 @@
     "core:webview:allow-internal-toggle-devtools",
     "clipboard-manager:default",
     "dialog:default",
-    "fs:default",
     "fs:allow-mkdir",
     "fs:allow-write-text-file",
     "fs:allow-write-file",
@@ -31,7 +30,10 @@
         { "path": "$HOME/.z-biz-tools" }
       ]
     },
-    "shell:default",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [{ "name": "open", "cmd": null, "args": true }]
+    },
     {
       "identifier": "http:default",
       "allow": [
