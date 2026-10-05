@@ -44,6 +44,15 @@ export interface ExternalPluginManifest {
   logo?: string;
   /** features 数组,每个 feature 是一个可独立触发的入口 */
   features: ExternalPluginFeature[];
+  /**
+   * 申请的权限名数组(可选)。
+   *
+   * **不写或写错的后果**: 只拿到隐式档(log / notify / storage),
+   * 读剪贴板、发网络请求、控制主窗口、invoke 后端命令都会被拒,
+   * 且插件会收到一条说明该往 plugin.json 补哪一条的错误。
+   * 权限取值见 permissions.ts。
+   */
+  permissions?: string[];
 }
 
 /**

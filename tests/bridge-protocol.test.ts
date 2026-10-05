@@ -21,9 +21,24 @@ import {
   dispatchBridgeMethod,
   isAllowedMethod,
   parseHello,
-  parseRpc,
+  parseRpc as parseRpcWithPerms,
+  permissionDenial,
   responseMessage,
 } from "../src/plugins/external/bridge-protocol.ts";
+import {
+  allPermissions,
+  resolvePermissions,
+} from "../src/plugins/external/permissions.ts";
+
+/**
+ * 本文件测**协议层**的白名单与结构校验, 权限不是本文件的主题,
+ * 所以统一把权限这层"打开", 让断言只反映白名单行为。
+ * 权限判据本身由 permissions.test.ts 单独测。
+ *
+ * 刻意**不**用 noPermissions(): 那会把"结构合法但没权限"混进"结构非法"里 ——
+ * 权限层一旦收紧, 这批白名单用例会集体变红, 而原因不在它们身上。
+ */
+const parseRpc = (data: unknown) => parseRpcWithPerms(data, allPermissions());
 
 const ok = (over: Partial<{ id: string; method: string; args: unknown[] }> = {}) => ({
   __zbiz: 1,

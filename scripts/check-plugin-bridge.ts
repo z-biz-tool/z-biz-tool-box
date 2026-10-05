@@ -13,10 +13,25 @@ import {
   createBudget,
   dispatchBridgeMethod,
   parseHello,
-  parseRpc,
+  parseRpc as realParseRpc,
   readyMessage,
   responseMessage,
 } from "../src/plugins/external/bridge-protocol.ts";
+import {
+  allPermissions,
+  noPermissions,
+  resolvePermissions,
+} from "../src/plugins/external/permissions.ts";
+
+/**
+ * 本脚本测**协议层**: 白名单 + 结构校验, 所以把权限这层显式全开。
+ *
+ * 证据: 最初直接写 `parseRpc(p)`, 被新加的运行期守卫
+ * "parseRpc: 缺少权限集" 当场拦下 —— 这条守卫正是为了兜住
+ * 「tsconfig 的 include 只有 src, 脚本与测试不受类型检查保护」这个盲区。
+ */
+const PERMS = allPermissions();
+const parseRpc = (data: unknown) => realParseRpc(data, PERMS);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const iframeSrc = readFileSync(join(here, "../src/plugins/external/PluginIframe.tsx"), "utf8");
@@ -138,6 +153,37 @@ check("args 被收敛为基础类型(未把宿主对象交给插件)", /set:hist
 // ---- 6. RPC 配额 ----
 const budget = createBudget(3, 0);
 check("令牌桶按 burst 放行", budget() && budget() && budget() && !budget());
+
+// ---- 7. 权限模型: 默认拒绝 ----
+// 这段是本仓对外的核心承诺, 放在自检里而不是只放在 tests 里:
+// `npm run check:bridge` 是改这块时最快能跑的那条命令。
+const bare = { __zbiz: 1, id: "p1", method: "readClipboard", args: [] };
+check("没声明权限的插件调 readClipboard 被拒", realParseRpc(bare, noPermissions()) === null);
+check(
+  "没声明权限的插件调 invoke(http_request) 被拒",
+  realParseRpc({ ...bare, method: "invoke", args: ["http_request", {}] }, noPermissions()) === null,
+);
+check(
+  "没声明权限的插件控制主窗口被拒",
+  realParseRpc({ ...bare, method: "hideMainWindow", args: [] }, noPermissions()) === null,
+);
+check(
+  "隐式档放行 notify",
+  realParseRpc({ ...bare, method: "notify", args: ["hi"] }, noPermissions()) !== null,
+);
+check(
+  "声明后才放行",
+  realParseRpc(bare, resolvePermissions({ permissions: ["clipboard.read"] })) !== null,
+);
+check(
+  "拿到 invoke 权限但没 http 权限时仍调不了 http_request",
+  realParseRpc({ ...bare, method: "invoke", args: ["http_request", {}] },
+    resolvePermissions({ permissions: ["invoke"] })) === null,
+);
+check(
+  "权限层不能放宽白名单: 全开也放行不了名单外方法",
+  realParseRpc({ ...bare, method: "readFile" }, PERMS) === null,
+);
 
 console.log(failed === 0 ? "\nALL CHECKS PASSED" : `\n${failed} CHECK(S) FAILED`);
 process.exit(failed === 0 ? 0 : 1);

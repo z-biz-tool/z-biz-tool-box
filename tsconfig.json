@@ -21,5 +21,9 @@
       "@/*": ["src/*"]
     }
   },
+  // 注意: tests **故意不在** include 里 —— 本仓没有 @types/node, 把测试
+  // 纳入类型检查会引入 node:test 的解析错误。
+  // 因此"漏传 perms 就报错"这条保护不能只靠类型检查, parseRpc 里另有运行期
+  // 守卫兜底(见 bridge-protocol.ts 的 assertPermsProvided)。
   "include": ["src"]
 }

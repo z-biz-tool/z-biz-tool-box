@@ -8,12 +8,14 @@ import {
   HOST_REPLY_TARGET_ORIGIN,
   parseHello,
   parseRpc,
+  permissionDenial,
   PLUGIN_SANDBOX,
   readyMessage,
   responseMessage,
   type BridgeMessage,
 } from "./bridge-protocol";
 import { openPluginsDir } from "./scanner";
+import { describeUnknown, resolvePermissions } from "./permissions.ts";
 import type { ExternalPlugin } from "./types";
 
 interface PluginIframeProps {
@@ -43,6 +45,8 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
     const iframe = iframeRef.current;
     if (!iframe) return;
     const api = buildZbizApi(plugin.id);
+    // 该插件的权限来自它自己的 plugin.json; 没写就是只拿到隐式档。
+    const perms = resolvePermissions(plugin);
     const takeToken = createBudget();
     const post = (msg: BridgeMessage) => {
       try {
@@ -59,8 +63,19 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         post(readyMessage(plugin.id));
         return;
       }
-      const rpc = parseRpc(ev.data);
-      if (!rpc) return; // 非法包: 静默丢弃, 不调用任何能力
+      const rpc = parseRpc(ev.data, perms);
+      if (!rpc) {
+        // 非法包与"有权限但被拒"要分开处理: 后者必须回一句可执行的原因,
+        // 否则插件作者只会看到"调用没反应", 永远查不出是权限没声明。
+        const reason = permissionDenial(ev.data, perms);
+        if (reason) {
+          const id = typeof ev.data === "object" && ev.data !== null ? (ev.data as { id?: unknown }).id : undefined;
+          if (typeof id === "string") {
+            post(responseMessage(id, undefined, reason));
+          }
+        }
+        return; // 不调用任何能力
+      }
       if (!takeToken()) {
         post(responseMessage(rpc.id, undefined, "zBiz 桥接: 调用过于频繁"));
         return;
@@ -86,6 +101,10 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
       window.removeEventListener("message", onMessage);
     };
   }, [plugin.id, reloadKey]);
+
+  // 声明了但宿主不认识的权限名: 几乎都是拼写错误, 静默忽略会让作者以为
+  // 权限已生效, 所以直接在界面上说出来。
+  const permissionNotice = describeUnknown(resolvePermissions(plugin));
 
   if (plugin.error) {
     return (
@@ -116,6 +135,16 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
           showIcon
           closable
           message={error}
+          onClose={() => setError(null)}
+          style={{ margin: "8px 16px 0" }}
+        />
+      )}
+      {permissionNotice && (
+        <Alert
+          type="warning"
+          showIcon
+          closable
+          message={permissionNotice}
           onClose={() => setError(null)}
           style={{ margin: "8px 16px 0" }}
         />
