@@ -1,3 +1,4 @@
+mod brother_tools;
 mod commands;
 mod plugin_engine;
 mod tray;
@@ -13,11 +14,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
             register_tools,
+            refresh_brother_tools,
             plugin_engine::http_request,
             get_state,
             apply_window_prefs,
@@ -30,8 +33,15 @@ pub fn run() {
                 let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
-            // 启动时先建一个空 tray
-            create_tray(app.handle(), vec![])?;
+            // 启动时先建 tray:内置工具占位"加载中…"+ 兄弟应用清单(用兄弟全量初检一次,
+            // 让菜单第一次弹出就显示真实可用状态,避免闪烁)
+            let initial_brothers = brother_tools::all_brothers_with_state();
+            eprintln!(
+                "[z-biz] brother tools scanned: {} total, {} installed",
+                initial_brothers.len(),
+                initial_brothers.iter().filter(|b| b.installed_path.is_some()).count()
+            );
+            create_tray(app.handle(), vec![], &initial_brothers)?;
 
             // 注册全局快捷键 ⌥Space 唤起/隐藏主窗口(Spotlight 风格)
             // macOS 默认 ⌘Space 是系统 Spotlight, 我们用 Alt+Space (即 ⌥Space)
@@ -82,8 +92,34 @@ pub fn run() {
 
 /// 前端 mount 时调用,把当前启用的工具分组推给 Rust 构建 tray 菜单
 #[tauri::command]
-fn register_tools(app: tauri::AppHandle, groups: Vec<GroupEntry>) -> Result<(), String> {
-    refresh_menu(&app, &groups).map_err(|e| e.to_string())
+fn register_tools(
+    app: tauri::AppHandle,
+    groups: Vec<GroupEntry>,
+) -> Result<(), String> {
+    // 每次都重检兄弟状态:用户可能刚装/卸了另一个 app,
+    // 我们的检测便宜(macOS mdfind 命中 Spotlight 索引,毫秒级)
+    let brothers = brother_tools::all_brothers_with_state();
+    refresh_menu(&app, &groups, &brothers).map_err(|e| e.to_string())
+}
+
+/// 手动触发兄弟应用重扫:用户在主面板按"重新扫描"时调用,
+/// 或者兄弟状态变了(`emit("brothers-changed")` 之类的扩展点)
+#[tauri::command]
+fn refresh_brother_tools(app: tauri::AppHandle) -> Result<usize, String> {
+    let brothers = brother_tools::all_brothers_with_state();
+    let installed = brothers.iter().filter(|b| b.installed_path.is_some()).count();
+    // 当前 groups 怎么拿?暂用内置空组:完整路径下,前端会再 register_tools 一次,
+    // 这里只刷兄弟,不影响分组
+    let _ = refresh_menu(
+        &app,
+        &[GroupEntry {
+            key: "_loading".into(),
+            label: "加载中…".into(),
+            tools: vec![],
+        }],
+        &brothers,
+    );
+    Ok(installed)
 }
 
 /// 测试命令: 只读, 返回主窗口当前状态

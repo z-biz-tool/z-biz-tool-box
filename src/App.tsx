@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { Tag, Typography, Button, Tooltip } from "antd";
+import { Modal, Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
+// 注:Rust 侧的「打开 releases」已迁到 tauri-plugin-opener。
+// 这里前端仍用 shell 的 open —— 它没被 TS 标记 deprecated, 且 capabilities
+// 早已授权 shell:allow-open(外部插件市场在用)。为一次调用再加个 JS 依赖不划算,
+// 待组织内其它仓统一迁 opener 时一起换。
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, DragHandle } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
@@ -9,6 +15,14 @@ import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 import { radius, shadow, size, motion } from "./_shared/designTokens";
+
+/// 来自 Rust tray on_menu_event 兄弟应用未装提示的事件 payload
+interface BrotherInstallPrompt {
+  key: string;
+  name: string;
+  displayName: string;
+  releaseUrl: string;
+}
 
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
@@ -31,11 +45,25 @@ function parseActiveKey(key: string):
 export default function App() {
   const [activeKey, setActiveKey] = useState<string>("spotlight");
   const [sourceMgrOpen, setSourceMgrOpen] = useState(false);
+  const [brotherPrompt, setBrotherPrompt] = useState<BrotherInstallPrompt | null>(null);
   const pushRecent = useUiStore((s) => s.pushRecent);
   const extPlugins = useExtStore((s) => s.plugins);
 
   useEffect(() => {
     initExtStore();
+  }, []);
+
+  // 监听 Rust 端兄弟应用未装提示 — 点击菜单里"☁️ xxx (未安装)"那一行触发
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<BrotherInstallPrompt>("brother-needs-install", (e) => {
+      setBrotherPrompt(e.payload);
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -255,6 +283,32 @@ export default function App() {
         open={sourceMgrOpen}
         onClose={() => setSourceMgrOpen(false)}
       />
+
+      {/* 兄弟应用未装提示 — Rust tray 点击"☁️ xxx (未安装)" 后 emit 此事件 */}
+      <Modal
+        open={brotherPrompt !== null}
+        title="未安装 — 前往下载？"
+        okText="前往下载"
+        cancelText="取消"
+        onOk={async () => {
+          const url = brotherPrompt?.releaseUrl;
+          setBrotherPrompt(null);
+          if (url) {
+            try {
+              await openExternal(url);
+            } catch (e) {
+              console.error("[z-biz] open release url failed:", e);
+            }
+          }
+        }}
+        onCancel={() => setBrotherPrompt(null)}
+      >
+        {brotherPrompt && (
+          <Typography.Text>
+            「{brotherPrompt.displayName}」未在本机检测到安装。前往 GitHub Releases 下载最新版？
+          </Typography.Text>
+        )}
+      </Modal>
     </ThemeProvider>
   );
 }

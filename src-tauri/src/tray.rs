@@ -1,3 +1,4 @@
+use crate::brother_tools::BrotherEntry;
 use serde::{Deserialize, Serialize};
 use tauri::{
     image::Image,
@@ -20,13 +21,18 @@ pub struct GroupEntry {
     pub tools: Vec<ToolEntry>,
 }
 
-/// 工具菜单项 id 前缀 — 用于 on_menu_event 区分来源
+/// 菜单项 id 前缀 — 用于 on_menu_event 区分来源
 const TOOL_ID_PREFIX: &str = "tool:";
+const BROTHER_ID_PREFIX: &str = "brother:";
 
-/// 把分组列表构造成 menu
+/// 把分组列表 + 兄弟清单构造成 menu
 /// Tauri 2 的 Submenu::with_items / Menu::with_items 接收 `&[&dyn IsMenuItem]`,
 /// 而 Box<dyn> 不能直接 coerce,所以这里用 "new + append" 模式构造。
-fn build_menu<R: Runtime>(app: &AppHandle<R>, groups: &[GroupEntry]) -> tauri::Result<Menu<R>> {
+fn build_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    groups: &[GroupEntry],
+    brothers: &[BrotherEntry],
+) -> tauri::Result<Menu<R>> {
     let menu = Menu::new(app)?;
 
     // 顶部快捷项: 显示/隐藏主窗口
@@ -47,6 +53,39 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, groups: &[GroupEntry]) -> tauri::R
         }
         menu.append(&sub)?;
     }
+
+    // 兄弟应用 — 即使清单为空也建 submenu,菜单结构稳定,避免 toggle 时跳
+    menu.append(&PredefinedMenuItem::separator(app)?)?;
+    let brothers_sub = Submenu::new(app, "🚀 兄弟应用", true)?;
+    if brothers.is_empty() {
+        let empty = MenuItem::with_id(
+            app,
+            "brother:empty",
+            "⏳ 等待扫描…",
+            false,
+            None::<&str>,
+        )?;
+        brothers_sub.append(&empty)?;
+    } else {
+        for b in brothers {
+            let (label, enabled) = if b.installed_path.is_some() {
+                (format!("📦 {}", b.display_name), true)
+            } else {
+                (format!("☁️ {} (未安装)", b.display_name), true)
+            };
+            let id = format!("{BROTHER_ID_PREFIX}{}", b.key);
+            brothers_sub.append(&MenuItem::with_id(app, &id, &label, enabled, None::<&str>)?)?;
+        }
+        brothers_sub.append(&PredefinedMenuItem::separator(app)?)?;
+        brothers_sub.append(&MenuItem::with_id(
+            app,
+            "brother:goto-releases",
+            "📥 浏览所有下载",
+            true,
+            None::<&str>,
+        )?)?;
+    }
+    menu.append(&brothers_sub)?;
 
     let sep = PredefinedMenuItem::separator(app)?;
     menu.append(&sep)?;
@@ -82,8 +121,22 @@ pub fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+/// 打开 GitHub release 列表;菜单事件 + 任何按钮都用得上
+/// 用 tauri-plugin-opener 而非 tauri-plugin-shell: shell 的 open 在 v2.3 起已 deprecated。
+pub fn open_releases_page<R: Runtime>(app: &AppHandle<R>) {
+    use tauri_plugin_opener::OpenerExt;
+    let url = "https://github.com/orgs/z-biz-tool/releases";
+    if let Err(e) = app.opener().open_url(url, None::<&str>) {
+        eprintln!("[z-biz] 打开 releases 页面失败: {e}");
+    }
+}
+
 /// 构建并启动 tray。groups: 初始工具列表(可为空,前端注册后重建)
-pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> tauri::Result<()> {
+pub fn create_tray<R: Runtime>(
+    app: &AppHandle<R>,
+    groups: Vec<GroupEntry>,
+    brothers: &[BrotherEntry],
+) -> tauri::Result<()> {
     let initial: Vec<GroupEntry> = if groups.is_empty() {
         vec![GroupEntry {
             key: "_loading".into(),
@@ -93,18 +146,13 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> t
     } else {
         groups
     };
-    let menu = build_menu(app, &initial)?;
+    let menu = build_menu(app, &initial, brothers)?;
 
     // 32x32.png — include_bytes! 编译期嵌入,运行时无 IO。
     let icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        // 不再 .icon_as_template(true):
-        //   - icons/32x32.png 是彩色 app 图标,template 模式要求「黑色 + alpha」,
-        //     彩色图当 template 会渲染成实心白块
-        //   - 直接用彩色版,与 app 自身图标一致;若以后想跟随亮/暗模式,
-        //     应单独提供 32x32Template.png (黑色 + alpha-only) 然后再开 template
         .tooltip("z-biz-tool-box")
         .menu(&menu)
         .show_menu_on_left_click(true) // 左键点击直接展开工具列表
@@ -124,11 +172,19 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> t
                 }
                 return;
             }
+            if id == "brother:goto-releases" {
+                open_releases_page(app);
+                return;
+            }
             if let Some(tool_key) = id.strip_prefix(TOOL_ID_PREFIX) {
                 // 1) 通知前端切到对应工具
                 let _ = app.emit("select-tool", tool_key.to_string());
                 // 2) 唤起主窗口
                 show_main_window(app);
+                return;
+            }
+            if let Some(brother_key) = id.strip_prefix(BROTHER_ID_PREFIX) {
+                handle_brother_click(app, brother_key);
             }
         })
         .on_tray_icon_event(|_tray, event| {
@@ -147,10 +203,42 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>, groups: Vec<GroupEntry>) -> t
     Ok(())
 }
 
-/// 用最新工具列表重建 menu。TrayIcon 不直接暴露 menu setter,所以用 app
+/// 兄弟应用菜单点击处理 — 安装的 launch,未装的 emit 事件让前端弹下载模态
+fn handle_brother_click<R: Runtime>(app: &AppHandle<R>, key: &str) {
+    let brothers = crate::brother_tools::all_brothers_with_state();
+    if let Some(b) = brothers.iter().find(|b| b.key == key) {
+        match &b.installed_path {
+            Some(path) => {
+                if let Err(e) = crate::brother_tools::launch(path) {
+                    eprintln!("[z-biz] 启动 {key} 失败: {e}");
+                }
+            }
+            None => {
+                let _ = app.emit(
+                    "brother-needs-install",
+                    serde_json::json!({
+                        "key": b.key,
+                        "name": b.name,
+                        "displayName": b.display_name,
+                        "releaseUrl": format!(
+                            "https://github.com/z-biz-tool/{}/releases/latest",
+                            b.name
+                        ),
+                    }),
+                );
+            }
+        }
+    }
+}
+
+/// 用最新工具列表 + 兄弟清单重建 menu。TrayIcon 不直接暴露 menu setter,所以用 app
 /// 拿到已建好的 tray 重新 set_menu。
-pub fn refresh_menu<R: Runtime>(app: &AppHandle<R>, groups: &[GroupEntry]) -> tauri::Result<()> {
-    let menu = build_menu(app, groups)?;
+pub fn refresh_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    groups: &[GroupEntry],
+    brothers: &[BrotherEntry],
+) -> tauri::Result<()> {
+    let menu = build_menu(app, groups, brothers)?;
     if let Some(tray) = app.tray_by_id("main-tray") {
         tray.set_menu(Some(menu))?;
     }
