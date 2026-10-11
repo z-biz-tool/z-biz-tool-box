@@ -48,11 +48,13 @@ pub fn all_brothers_with_state() -> Vec<BrotherEntry> {
     out
 }
 
-/// bundle_id 给 macOS 查 Spotlight;name 给 Win/Linux 拼路径。
-/// 其它平台 `_name` 不读,下划线压 unused 警告。
+/// 各平台分别用 bundle_id（macOS 查 Spotlight）或 name（拼安装路径）定位已安装产物。
+/// `_name` 只是为了让 macOS 分支以外的编译目标不报 unused。
 fn detect_one(bundle_id: &str, _name: &str) -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
-    { return detect_macos(bundle_id); }
+    {
+        return detect_macos(bundle_id, _name);
+    }
     #[cfg(target_os = "windows")]
     { let _ = bundle_id; return detect_windows(_name); }
     #[cfg(target_os = "linux")]
@@ -61,31 +63,64 @@ fn detect_one(bundle_id: &str, _name: &str) -> Option<PathBuf> {
     { let _ = (bundle_id, _name); None }
 }
 
-/// macOS: `mdfind` 查 Spotlight 索引,拿 CFBundleIdentifier 匹配的 .app 路径。
-/// mdfind 不可用/索引未建时返回 None，不报错（用户可能没开 Spotlight），
-/// 这时菜单里该兄弟会全部进"未安装"，可以接受 — 功能降级而非崩溃。
+/// macOS 探测。顺序刻意是「先标准装机目录，再全盘索引」：
+///
+/// Spotlight(mdfind) 索引整盘，会把开发仓 `src-tauri/target/release/bundle/macos/*.app`
+/// 里的**构建产物**也当成已安装（2026-10-11 实测：db/file/note/kb/cpu/aigen 六个
+/// 命中的全是 target 下的构建副本，/Applications 里根本没装）。直接信 mdfind 会让
+/// 「召唤」拉起一份 target 里的僵尸副本，而不是用户真正在用的那个。
+///
+/// 所以：① 先按 name 直接探 /Applications 与 ~/Applications（无子进程、命中即准）；
+/// ② 再退回 mdfind，但显式排除构建目录。
 #[cfg(target_os = "macos")]
-fn detect_macos(bundle_id: &str) -> Option<PathBuf> {
-    use std::process::Command;
-    // mdfind 使用 Spotlight 索引, 比 ls /Applications + 解析 Info.plist 快得多。
-    // ⚠️ bundle_id 来自代码生成,不来自用户输入,但仍然做一次字符白名单:
-    //   - Apple bundle_id 限定 [a-zA-Z0-9.-]
-    //   - 我们 shell 拼接字面量, 这里转义单引号防御
-    if !bundle_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_') {
+fn detect_macos(bundle_id: &str, name: &str) -> Option<PathBuf> {
+    if !is_safe_filename(name) {
         return None;
     }
-    let query = format!("kMDItemCFBundleIdentifier == '{bundle_id}'");
-    let out = Command::new("mdfind").arg(&query).output().ok()?;
+    let app_name = format!("{name}.app");
+
+    // ① 标准装机目录：路径由白名单校验过的 name 拼出，不涉及用户输入
+    let mut roots: Vec<PathBuf> = vec![PathBuf::from("/Applications")];
+    if let Some(home) = std::env::var_os("HOME") {
+        roots.push(PathBuf::from(home).join("Applications"));
+    }
+    for root in roots {
+        let p = root.join(&app_name);
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+
+    // ② 退回全盘索引。注意这里传 bundle_id，仍要先过字符白名单再拼进 mdfind 查询串
+    if !bundle_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+    {
+        return None;
+    }
+    let out = std::process::Command::new("mdfind")
+        .arg(format!("kMDItemCFBundleIdentifier == '{bundle_id}'"))
+        .output()
+        .ok()?;
     if !out.status.success() {
         return None;
     }
-    let s = String::from_utf8_lossy(&out.stdout);
-    let first = s
-        .lines()
+    let text = String::from_utf8_lossy(&out.stdout);
+    text.lines()
         .map(str::trim)
-        .find(|l| !l.is_empty() && l.ends_with(".app"))?;
-    let p = PathBuf::from(first);
-    if p.exists() { Some(p) } else { None }
+        .filter(|l| l.ends_with(".app"))
+        .map(PathBuf::from)
+        .find(|p| p.is_dir() && !is_build_artifact(p))
+}
+
+/// 判断路径是否落在构建产物目录里。cargo 的 target/ 与前端 node_modules/ 下的
+/// .app 都是构建副本，不是装机。
+#[cfg(target_os = "macos")]
+fn is_build_artifact(path: &Path) -> bool {
+    path.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy();
+        s == "target" || s == "node_modules" || s == "dist"
+    })
 }
 
 /// Windows 安装探测。候选路径按「命中率高、成本低」排序。

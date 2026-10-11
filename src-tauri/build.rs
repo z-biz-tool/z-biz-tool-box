@@ -53,6 +53,13 @@ struct BrotherSeed {
     display_name: String, // "AI 任务看板"
 }
 
+/// 参与「兄弟应用召唤」的 type 白名单。
+/// - `product`          主力 Tauri 产品
+/// - `product-local`    本地计算类(cpu/math)，装机后同样是带 bundle_id 的桌面 .app
+/// - `product-electron` Electron 产品(pet)，同理可探测可拉起
+/// 刻意排除 `library` / `capability` / `meta`：它们没有可启动的桌面产物。
+const SUMMONABLE_TYPES: [&str; 3] = ["product", "product-local", "product-electron"];
+
 fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
     let raw = fs::read_to_string(path).map_err(|e| format!("read: {e}"))?;
     let v: serde_json::Value =
@@ -64,13 +71,8 @@ fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
     let mut out = Vec::new();
     for r in arr {
         let rtype = r.get("type").and_then(|x| x.as_str()).unwrap_or("");
-        if rtype != "product" {
-            // 只收割 type=product：product-local / product-electron / library / capability / meta
-            // 当前不参与召唤，等 manifest 重新分类后再补；CPU/math 是 product-local 但仍有
-            // bundle_id，这里按"产品"理解一起收 — 见 manifest 字段说明
-            if rtype != "product-local" {
-                continue;
-            }
+        if !SUMMONABLE_TYPES.contains(&rtype) {
+            continue;
         }
         let name = match r.get("name").and_then(|x| x.as_str()) {
             Some(s) => s.to_string(),
@@ -87,7 +89,7 @@ fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
             .get("purpose")
             .and_then(|x| x.as_str())
             .unwrap_or(&name);
-        let display_name = short_label_from_purpose(purpose);
+        let display_name = display_label(purpose, &name);
         let key = name.strip_prefix("z-biz-tool-").unwrap_or(&name).to_string();
         out.push(BrotherSeed {
             key,
@@ -99,11 +101,30 @@ fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
     Ok(out)
 }
 
-/// 从 purpose 里取首段中文短名。
-/// 按出现位置排序,先到先得。涵盖:
+/// 菜单里显示的名字：取 purpose 首段；但若首段是「slug 形态」就退回仓名短形式。
+/// slug 形态 = 含 - 或 _ 且没有大写字母，用来识别 pet 那种
+/// "z-biz-companion-pet-cos — 桌面宠物 + ..." 的英文连字符前缀。
+/// 不能拿「有没有中文」当判据 —— ZenNote / GeoLab 这类正经产品名不含中文，
+/// 那样会被误伤成 "note" / "math"。
+fn display_label(purpose: &str, repo_name: &str) -> String {
+    let head = first_segment(purpose);
+    if looks_like_slug(&head) {
+        return repo_name
+            .strip_prefix("z-biz-tool-")
+            .unwrap_or(repo_name)
+            .to_string();
+    }
+    head
+}
+
+fn looks_like_slug(s: &str) -> bool {
+    (s.contains('-') || s.contains('_')) && !s.chars().any(|c| c.is_ascii_uppercase())
+}
+
+/// 从 purpose 里切出首段（分隔符之前）。涵盖:
 ///   em dash "—" 前/后空格任意组合、en dash "–" 同上、
 ///   ASCII hyphen "-" 三种空格组合、英文冒号 ":"
-fn short_label_from_purpose(p: &str) -> String {
+fn first_segment(p: &str) -> String {
     let mut candidates: Vec<(usize, &str)> = Vec::new();
     for sep in [
         " — ", " —", "— ",

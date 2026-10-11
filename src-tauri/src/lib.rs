@@ -41,6 +41,15 @@ pub fn run() {
                 initial_brothers.len(),
                 initial_brothers.iter().filter(|b| b.installed_path.is_some()).count()
             );
+            // 打出每个命中项解析到的实际路径: 召唤功能一旦"打开了错的 app",
+            // 这行日志就是判断依据(macOS 上尤其要看清是 /Applications 还是构建产物)
+            for b in initial_brothers.iter().filter(|b| b.installed_path.is_some()) {
+                eprintln!(
+                    "[z-biz]   ✓ {} → {}",
+                    b.display_name,
+                    b.installed_path.as_deref().unwrap().display()
+                );
+            }
             create_tray(app.handle(), vec![], &initial_brothers)?;
 
             // 注册全局快捷键 ⌥Space 唤起/隐藏主窗口(Spotlight 风格)
