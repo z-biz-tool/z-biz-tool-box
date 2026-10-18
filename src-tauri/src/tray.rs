@@ -203,7 +203,7 @@ pub fn create_tray<R: Runtime>(
     Ok(())
 }
 
-/// 兄弟应用菜单点击处理 — 安装的 launch,未装的 emit 事件让前端弹下载模态
+/// 兄弟应用菜单点击处理 — 安装的 launch,未装的打开主窗口的「家族应用」面板并高亮
 fn handle_brother_click<R: Runtime>(app: &AppHandle<R>, key: &str) {
     let brothers = crate::brother_tools::all_brothers_with_state();
     if let Some(b) = brothers.iter().find(|b| b.key == key) {
@@ -214,18 +214,9 @@ fn handle_brother_click<R: Runtime>(app: &AppHandle<R>, key: &str) {
                 }
             }
             None => {
-                let _ = app.emit(
-                    "brother-needs-install",
-                    serde_json::json!({
-                        "key": b.key,
-                        "name": b.name,
-                        "displayName": b.display_name,
-                        "releaseUrl": format!(
-                            "https://github.com/z-biz-tool/{}/releases/latest",
-                            b.name
-                        ),
-                    }),
-                );
+                // 未装:不跳浏览器,直接进面板 —— 那里有 icon、版本和「安装」按钮
+                let _ = app.emit("open-brothers", b.key.to_string());
+                show_main_window(app);
             }
         }
     }

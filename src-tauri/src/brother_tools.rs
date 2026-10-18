@@ -5,6 +5,7 @@
 //! 检测/启动按平台分支: macOS mdfind / Windows %LOCALAPPDATA%\Programs / Linux .desktop。
 
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// 运行时兄弟应用条目: codegen 出的种子 + 检测后填 installed_path
@@ -15,12 +16,18 @@ pub struct BrotherEntry {
     pub bundle_id: String,   // "com.zifang.z-biz-tool-worker"
     pub display_name: String,// "AI 任务看板"
     pub installed_path: Option<PathBuf>,
+    pub installed_version: Option<String>, // 本机 CFBundleShortVersionString
 }
 
 /// 由 build.rs 注入。BrotherSeed struct 与 const GENERATED_BROTHERS 都来自
 /// 生成文件,这里只转发 — 不能在本文件再定义同名 struct,会触发 "defined multiple times"。
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated_brothers.rs"));
+}
+
+/// 兄弟图标 PNG(编译期从各兄弟仓内嵌,见 build.rs codegen_brother_icons)
+mod generated_icons {
+    include!(concat!(env!("OUT_DIR"), "/generated_brother_icons.rs"));
 }
 
 use generated::BrotherSeed;
@@ -33,8 +40,17 @@ impl BrotherEntry {
             bundle_id: seed.bundle_id.to_string(),
             display_name: seed.display_name.to_string(),
             installed_path: None,
+            installed_version: None,
         }
     }
+}
+
+/// 面板卡片用的图标字节。缺图(兄弟仓未 clone)时返回 None,前端退回首字母色块。
+pub fn icon_png(key: &str) -> Option<&'static [u8]> {
+    generated_icons::GENERATED_BROTHER_ICONS
+        .iter()
+        .find(|i| i.key == key)
+        .and_then(|i| i.png)
 }
 
 pub fn all_brothers_with_state() -> Vec<BrotherEntry> {
@@ -44,8 +60,41 @@ pub fn all_brothers_with_state() -> Vec<BrotherEntry> {
         .collect();
     for b in out.iter_mut() {
         b.installed_path = detect_one(&b.bundle_id, &b.name);
+        b.installed_version = b
+            .installed_path
+            .as_deref()
+            .and_then(read_bundle_version);
     }
     out
+}
+
+/// 从 <app>/Contents/Info.plist 读 CFBundleShortVersionString。
+/// 不引 plist crate:只按 <key>…</key><string>…</string> 的成对结构取值,
+/// 兄弟仓的 Info.plist 都是 tauri-build 生成的规整单层 plist。
+pub fn read_bundle_version(app_path: &Path) -> Option<String> {
+    let plist = app_path.join("Contents/Info.plist");
+    let text = fs::read_to_string(plist).ok()?;
+    plist_string_value(&text, "CFBundleShortVersionString")
+}
+
+/// 取 plist 里某个 <key>K</key> 后面紧跟的 <string> 值。
+pub fn plist_string_value(text: &str, key: &str) -> Option<String> {
+    let after = text.split_once(&format!("<key>{key}</key>"))?.1;
+    let start = after.find("<string>")? + "<string>".len();
+    let end = after[start..].find("</string>")? + start;
+    let v = after[start..end].trim();
+    if v.is_empty() {
+        None
+    } else {
+        Some(v.to_string())
+    }
+}
+
+/// 取 plist 里的 CFBundleIdentifier,用于校验下载下来的 .app 是不是清单里那个。
+pub fn read_bundle_id(app_path: &Path) -> Option<String> {
+    let plist = app_path.join("Contents/Info.plist");
+    let text = fs::read_to_string(plist).ok()?;
+    plist_string_value(&text, "CFBundleIdentifier")
 }
 
 /// 各平台分别用 bundle_id（macOS 查 Spotlight）或 name（拼安装路径）定位已安装产物。
@@ -267,4 +316,42 @@ fn spawn(path: &Path) -> std::io::Result<()> {
     // 直接解析 .desktop 内部 Exec 也行,但需要 ini parser;xdg-open 已覆盖 99% 场景
     Command::new("xdg-open").arg(path).spawn()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PLIST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.zifang.z-biz-tool-note</string>
+  <key>CFBundleShortVersionString</key><string>0.2.1</string>
+</dict></plist>"#;
+
+    #[test]
+    fn plist_reads_version() {
+        assert_eq!(
+            plist_string_value(PLIST, "CFBundleShortVersionString").as_deref(),
+            Some("0.2.1")
+        );
+        assert_eq!(
+            plist_string_value(PLIST, "CFBundleIdentifier").as_deref(),
+            Some("com.zifang.z-biz-tool-note")
+        );
+        assert_eq!(plist_string_value(PLIST, "CFBundleVersion"), None);
+    }
+
+    /// 版本号是更新检测的比对基准,读错会让面板一直报「可更新」或永远不报。
+    #[test]
+    fn installed_version_from_real_app() {
+        let app = Path::new("/Applications/z-biz-tool-note.app");
+        if !app.is_dir() {
+            return; // 本机没装就跳过,不编造断言
+        }
+        assert_eq!(read_bundle_version(app).as_deref(), Some("0.2.1"));
+        assert_eq!(
+            read_bundle_id(app).as_deref(),
+            Some("com.zifang.z-biz-tool-note")
+        );
+    }
 }

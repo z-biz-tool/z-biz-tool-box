@@ -1,5 +1,6 @@
 mod brother_tools;
 mod commands;
+mod installer;
 mod plugin_engine;
 mod tray;
 
@@ -25,6 +26,9 @@ pub fn run() {
             get_state,
             apply_window_prefs,
             uninstall_plugin,
+            installer::brother_overview,
+            installer::install_brother,
+            installer::launch_brother,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标

@@ -34,6 +34,7 @@ interface SpotlightProps {
   onOpenPreferences: () => void;
   onOpenShortcuts: () => void;
   onOpenMarketSources: () => void;
+  onOpenBrothers: () => void;
 }
 
 type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
@@ -44,7 +45,7 @@ type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
  *  - 左/中列: 极简导航, 圆角 hover/active
  *  - 右列功能行: 渐变 active 背景 + scale 1.005 + 阴影 + cmds chip 渐变
  */
-export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts, onOpenMarketSources }: SpotlightProps) {
+export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts, onOpenMarketSources, onOpenBrothers }: SpotlightProps) {
   const [query, setQuery] = useState("");
   const [activeNav, setActiveNav] = useState<NavKey>("all");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -301,6 +302,11 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             />
           </NavSection>
           <NavSection title="设置">
+            <NavItem
+              icon={<AppstoreOutlined />}
+              label="家族应用"
+              onClick={onOpenBrothers}
+            />
             <NavItem
               icon={<SettingOutlined />}
               label="偏好设置"

@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
-import { Modal, Tag, Typography, Button, Tooltip } from "antd";
+import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { open as openExternal } from "@tauri-apps/plugin-shell";
-// 注:Rust 侧的「打开 releases」已迁到 tauri-plugin-opener。
-// 这里前端仍用 shell 的 open —— 它没被 TS 标记 deprecated, 且 capabilities
-// 早已授权 shell:allow-open(外部插件市场在用)。为一次调用再加个 JS 依赖不划算,
-// 待组织内其它仓统一迁 opener 时一起换。
-import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, DragHandle } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
@@ -16,25 +11,21 @@ import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 import { radius, shadow, size, motion } from "./_shared/designTokens";
 
-/// 来自 Rust tray on_menu_event 兄弟应用未装提示的事件 payload
-interface BrotherInstallPrompt {
-  key: string;
-  name: string;
-  displayName: string;
-  releaseUrl: string;
-}
-
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
   | { kind: "market" }
   | { kind: "preferences" }
   | { kind: "shortcuts" }
+  | { kind: "brothers"; highlight: string | null }
   | { kind: "external"; pluginId: string; featureCode: string }
   | { kind: "builtin" } {
   if (key === "spotlight") return { kind: "spotlight" };
   if (key === "market") return { kind: "market" };
   if (key === "preferences") return { kind: "preferences" };
   if (key === "shortcuts") return { kind: "shortcuts" };
+  if (key.startsWith("brothers::")) {
+    return { kind: "brothers", highlight: key.slice("brothers::".length) || null };
+  }
   if (key.startsWith("ext::")) {
     const [, pluginId, featureCode] = key.split("::");
     return { kind: "external", pluginId, featureCode };
@@ -45,7 +36,6 @@ function parseActiveKey(key: string):
 export default function App() {
   const [activeKey, setActiveKey] = useState<string>("spotlight");
   const [sourceMgrOpen, setSourceMgrOpen] = useState(false);
-  const [brotherPrompt, setBrotherPrompt] = useState<BrotherInstallPrompt | null>(null);
   const pushRecent = useUiStore((s) => s.pushRecent);
   const extPlugins = useExtStore((s) => s.plugins);
 
@@ -53,11 +43,11 @@ export default function App() {
     initExtStore();
   }, []);
 
-  // 监听 Rust 端兄弟应用未装提示 — 点击菜单里"☁️ xxx (未安装)"那一行触发
+  // Rust tray 点未装兄弟那一行 → 直接进面板并高亮那张卡
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<BrotherInstallPrompt>("brother-needs-install", (e) => {
-      setBrotherPrompt(e.payload);
+    listen<string>("open-brothers", (e) => {
+      setActiveKey(`brothers::${e.payload}`);
     }).then((u) => {
       unlisten = u;
     });
@@ -246,6 +236,7 @@ export default function App() {
             onOpenPreferences={() => setActiveKey("preferences")}
             onOpenShortcuts={() => setActiveKey("shortcuts")}
             onOpenMarketSources={() => setSourceMgrOpen(true)}
+            onOpenBrothers={() => setActiveKey("brothers::")}
           />
         ) : active.kind === "market" ? (
           <MarketView
@@ -258,6 +249,11 @@ export default function App() {
           <PreferencesView onBack={() => setActiveKey("spotlight")} />
         ) : active.kind === "shortcuts" ? (
           <ShortcutsView onBack={() => setActiveKey("spotlight")} />
+        ) : active.kind === "brothers" ? (
+          <BrothersView
+            onBack={() => setActiveKey("spotlight")}
+            highlightKey={active.highlight}
+          />
         ) : (
           <ToolView
             title={activeTool?.label ?? (extPlugin?.name ?? "工具")}
@@ -283,32 +279,6 @@ export default function App() {
         open={sourceMgrOpen}
         onClose={() => setSourceMgrOpen(false)}
       />
-
-      {/* 兄弟应用未装提示 — Rust tray 点击"☁️ xxx (未安装)" 后 emit 此事件 */}
-      <Modal
-        open={brotherPrompt !== null}
-        title="未安装 — 前往下载？"
-        okText="前往下载"
-        cancelText="取消"
-        onOk={async () => {
-          const url = brotherPrompt?.releaseUrl;
-          setBrotherPrompt(null);
-          if (url) {
-            try {
-              await openExternal(url);
-            } catch (e) {
-              console.error("[z-biz] open release url failed:", e);
-            }
-          }
-        }}
-        onCancel={() => setBrotherPrompt(null)}
-      >
-        {brotherPrompt && (
-          <Typography.Text>
-            「{brotherPrompt.displayName}」未在本机检测到安装。前往 GitHub Releases 下载最新版？
-          </Typography.Text>
-        )}
-      </Modal>
     </ThemeProvider>
   );
 }
