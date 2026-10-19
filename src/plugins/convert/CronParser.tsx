@@ -3,6 +3,9 @@ import { Card, Input, Button, Space, Tag, Alert, Row, Col } from "antd";
 
 import { useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
+// 解析/描述/下次运行时间的纯逻辑在 cronLogic.ts：
+// 组件只负责渲染，计算与校验全在纯逻辑模块里（可被 node --test 直接测）。
+import { getCronDescription } from "./cronLogic";
 export const meta: PluginMeta = {
   key: "cron",
   label: "Cron 解析",
@@ -17,110 +20,6 @@ interface CronField {
   value: string;
   min: number;
   max: number;
-}
-
-function parseField(value: string, _min: number, _max: number, fieldName: string): string {
-  if (value === "*") return `每${fieldName}`;
-  if (value.startsWith("*/")) {
-    const step = parseInt(value.slice(2), 10);
-    if (isNaN(step)) return `无效的${fieldName}步长`;
-    return `每隔${step}${fieldName}`;
-  }
-  if (value.includes(",")) {
-    const parts = value.split(",").map((v) => v.trim());
-    return `指定的${fieldName}: ${parts.join("、")}`;
-  }
-  if (value.includes("-")) {
-    const [start, end] = value.split("-").map((v) => parseInt(v.trim(), 10));
-    if (isNaN(start) || isNaN(end)) return `无效的${fieldName}范围`;
-    return `${fieldName}从${start}到${end}`;
-  }
-  const num = parseInt(value, 10);
-  if (!isNaN(num)) return `第${num}${fieldName}`;
-  return `无效的${fieldName}`;
-}
-
-function getCronDescription(expr: string): {
-  description: string;
-  nextRuns: Date[];
-  error?: string;
-} {
-  const parts = expr.trim().split(/\s+/);
-  if (parts.length < 5 || parts.length > 6) {
-    return {
-      description: "",
-      nextRuns: [],
-      error: "Cron 表达式必须有 5 或 6 个字段（分 时 日 月 周 [秒]）",
-    };
-  }
-
-  const hasSeconds = parts.length === 6;
-  const offset = hasSeconds ? 1 : 0;
-  const minute = parts[offset];
-  const hour = parts[offset + 1];
-  const dayOfMonth = parts[offset + 2];
-  const month = parts[offset + 3];
-  const dayOfWeek = parts[offset + 4];
-  const second = hasSeconds ? parts[0] : "0";
-
-  const descMin = parseField(minute, 0, 59, "分钟");
-  const descHour = parseField(hour, 0, 23, "小时");
-  const descDay = parseField(dayOfMonth, 1, 31, "日");
-  const descMonth = parseField(month, 1, 12, "月");
-  const descWeek = parseField(dayOfWeek, 0, 7, "周");
-
-  const weekMap: Record<string, string> = {
-    "0": "日",
-    "1": "一",
-    "2": "二",
-    "3": "三",
-    "4": "四",
-    "5": "五",
-    "6": "六",
-    "7": "日",
-  };
-  let descWeekZh = descWeek;
-  if (/^[0-7]$/.test(dayOfWeek)) {
-    descWeekZh = `每周${weekMap[dayOfWeek] || dayOfWeek}`;
-  } else if (dayOfWeek === "*") {
-    descWeekZh = "每天";
-  } else if (dayOfWeek.startsWith("*/")) {
-    descWeekZh = `每${dayOfWeek.slice(2)}周`;
-  }
-
-  const monthMap: Record<string, string> = {
-    "1": "一月",
-    "2": "二月",
-    "3": "三月",
-    "4": "四月",
-    "5": "五月",
-    "6": "六月",
-    "7": "七月",
-    "8": "八月",
-    "9": "九月",
-    "10": "十月",
-    "11": "十一月",
-    "12": "十二月",
-  };
-  let descMonthZh = descMonth;
-  if (/^[1-9]$|^1[0-2]$/.test(month)) {
-    descMonthZh = monthMap[month] || month;
-  }
-
-  let description = `${descMonthZh} ${descDay === "每日" ? "" : descDay} ${descWeekZh === "每天" ? "" : descWeekZh} ${descHour} ${descMin}`;
-  if (hasSeconds) {
-    description += `，${parseField(second, 0, 59, "秒")}`;
-  }
-
-  // 计算下次运行时间（简化版）
-  const nextRuns: Date[] = [];
-  const now = new Date();
-  for (let i = 0; i < 3; i++) {
-    const next = new Date(now.getTime() + (i + 1) * 60000);
-    nextRuns.push(next);
-  }
-
-  return { description, nextRuns };
 }
 
 const EXAMPLES = [

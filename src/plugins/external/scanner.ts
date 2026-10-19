@@ -9,6 +9,7 @@ import { join } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { ExternalPlugin, ExternalPluginManifest } from "./types";
 import { getPluginsDir } from "./paths";
+import { checkApiCompatibility, parsePluginApiVersion } from "./api-version.ts";
 
 let cachedDir: string | null = null;
 async function pluginsDir(): Promise<string> {
@@ -62,6 +63,21 @@ async function loadOnePlugin(
     const mainPath = await join(dirPath, mainFile);
     const logoPath = await join(dirPath, logoFile);
 
+    // 协议版本裁决(台账 T2.1): 插件要的 zBiz 代数比宿主新 ⇒ 不加载。
+    // 放在这里而不是等到握手, 是因为握手期的拒绝会让插件一直转圈 ——
+    // 加载期直接标成 error, 用户在插件列表里一眼能看见"为什么不工作"。
+    const pluginApi = parsePluginApiVersion(m);
+    const compat = checkApiCompatibility(pluginApi);
+    if (!compat.ok) {
+      return {
+        ...m,
+        zbizApi: pluginApi,
+        dirPath,
+        mainUrl: "",
+        error: compat.reason ?? "zBiz 协议版本不兼容",
+      };
+    }
+
     // convertFileSrc 把绝对路径 → asset://localhost/... URL(与宿主跨源,
     // 需 Cargo features 开 protocol-asset + tauri.conf.json 配 assetProtocol)
     const mainUrl = convertFileSrc(mainPath);
@@ -72,7 +88,7 @@ async function loadOnePlugin(
       // 图标可选,失败忽略
     }
 
-    return { ...m, dirPath, mainUrl, logoUrl };
+    return { ...m, zbizApi: pluginApi, dirPath, mainUrl, logoUrl };
   } catch (e) {
     return {
       id: fallbackId,

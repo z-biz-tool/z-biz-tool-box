@@ -11,10 +11,10 @@ use std::path::{Path, PathBuf};
 /// 运行时兄弟应用条目: codegen 出的种子 + 检测后填 installed_path
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrotherEntry {
-    pub key: String,         // "worker"  — tray id & GitHub repo 短名
-    pub name: String,        // "z-biz-tool-worker"
-    pub bundle_id: String,   // "com.zifang.z-biz-tool-worker"
-    pub display_name: String,// "AI 任务看板"
+    pub key: String,          // "worker"  — tray id & GitHub repo 短名
+    pub name: String,         // "z-biz-tool-worker"
+    pub bundle_id: String,    // "com.zifang.z-biz-tool-worker"
+    pub display_name: String, // "AI 任务看板"
     pub installed_path: Option<PathBuf>,
     pub installed_version: Option<String>, // 本机 CFBundleShortVersionString
 }
@@ -56,14 +56,11 @@ pub fn icon_png(key: &str) -> Option<&'static [u8]> {
 pub fn all_brothers_with_state() -> Vec<BrotherEntry> {
     let mut out: Vec<BrotherEntry> = generated::GENERATED_BROTHERS
         .iter()
-        .map(|s| BrotherEntry::from_seed(s))
+        .map(BrotherEntry::from_seed)
         .collect();
     for b in out.iter_mut() {
         b.installed_path = detect_one(&b.bundle_id, &b.name);
-        b.installed_version = b
-            .installed_path
-            .as_deref()
-            .and_then(read_bundle_version);
+        b.installed_version = b.installed_path.as_deref().and_then(read_bundle_version);
     }
     out
 }
@@ -102,14 +99,23 @@ pub fn read_bundle_id(app_path: &Path) -> Option<String> {
 fn detect_one(bundle_id: &str, _name: &str) -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
-        return detect_macos(bundle_id, _name);
+        detect_macos(bundle_id, _name)
     }
     #[cfg(target_os = "windows")]
-    { let _ = bundle_id; return detect_windows(_name); }
+    {
+        let _ = bundle_id;
+        return detect_windows(_name);
+    }
     #[cfg(target_os = "linux")]
-    { let _ = bundle_id; return detect_linux(_name); }
+    {
+        let _ = bundle_id;
+        return detect_linux(_name);
+    }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    { let _ = (bundle_id, _name); None }
+    {
+        let _ = (bundle_id, _name);
+        None
+    }
 }
 
 /// macOS 探测。顺序刻意是「先标准装机目录，再全盘索引」：
@@ -187,7 +193,10 @@ fn detect_windows(name: &str) -> Option<PathBuf> {
     // ① Tauri NSIS 默认：%LOCALAPPDATA%\Programs\<productName>\<productName>.exe
     //   MSI 装到 Program Files，走 ②③ 兜。
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        let p = Path::new(&local).join("Programs").join(name).join(&exe_name);
+        let p = Path::new(&local)
+            .join("Programs")
+            .join(name)
+            .join(&exe_name);
         if p.exists() {
             return Some(p);
         }
@@ -226,13 +235,8 @@ fn query_windows_install_location(name: &str) -> Option<PathBuf> {
     // name 已过 is_safe_filename 白名单，但仍不把它拼进 reg 的键路径字符串以外的地方；
     // reg query 的键路径不含用户输入（只含固定前缀 + name），白名单已足够。
     for hive in ["HKCU", "HKLM"] {
-        let key = format!(
-            r"{hive}\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{name}"
-        );
-        let Ok(out) = Command::new("reg")
-            .args(["query", &key, "/ve"])
-            .output()
-        else {
+        let key = format!(r"{hive}\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{name}");
+        let Ok(out) = Command::new("reg").args(["query", &key, "/ve"]).output() else {
             continue;
         };
         if !out.status.success() {
@@ -249,7 +253,7 @@ fn query_windows_install_location(name: &str) -> Option<PathBuf> {
             // 第三段整体就是路径，不会被拆散。
             let mut parts = rest.trim_start().splitn(3, char::is_whitespace);
             let _type = parts.next(); // REG_SZ / REG_EXPAND_SZ
-            let _gap = parts.next();  // 类型名与值之间的空白
+            let _gap = parts.next(); // 类型名与值之间的空白
             let value = parts.next().unwrap_or("").trim().trim_matches('"');
             if value.len() > 3 {
                 return Some(PathBuf::from(value));

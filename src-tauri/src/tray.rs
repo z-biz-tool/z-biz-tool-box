@@ -36,7 +36,13 @@ fn build_menu<R: Runtime>(
     let menu = Menu::new(app)?;
 
     // 顶部快捷项: 显示/隐藏主窗口
-    let show_item = MenuItem::with_id(app, "show-main", "🔍 唤起主窗口 (⌥Space)", true, None::<&str>)?;
+    let show_item = MenuItem::with_id(
+        app,
+        "show-main",
+        "🔍 唤起主窗口 (⌥Space)",
+        true,
+        None::<&str>,
+    )?;
     menu.append(&show_item)?;
     let hide_item = MenuItem::with_id(app, "hide-main", "👋 隐藏主窗口", true, None::<&str>)?;
     menu.append(&hide_item)?;
@@ -58,13 +64,7 @@ fn build_menu<R: Runtime>(
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     let brothers_sub = Submenu::new(app, "🚀 兄弟应用", true)?;
     if brothers.is_empty() {
-        let empty = MenuItem::with_id(
-            app,
-            "brother:empty",
-            "⏳ 等待扫描…",
-            false,
-            None::<&str>,
-        )?;
+        let empty = MenuItem::with_id(app, "brother:empty", "⏳ 等待扫描…", false, None::<&str>)?;
         brothers_sub.append(&empty)?;
     } else {
         for b in brothers {

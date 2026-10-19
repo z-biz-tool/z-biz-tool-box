@@ -51,6 +51,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # 桥接安全自检: 断言沙箱不含 allow-same-origin、协议层拒绝伪造/越权包、
+      # 以及**源码层面**的接线(例如 buildZbizApi 真的把权限集传进去了)。
+      # 这条脚本抓的是"测试覆盖不到的接线"—— 逻辑对但没接上, 单测照样全绿。
+      - name: Plugin bridge self-check
+        run: npm run check:bridge
+
       # dist 在 .gitignore 里，而 tauri::generate_context! 要读 frontendDist，
       # 所以任何 cargo 步骤之前必须先出一次前端。
       - name: Build frontend
@@ -89,10 +95,21 @@ jobs:
 
       - name: Tests
         working-directory: src-tauri
-        run: cargo test
+        run: cargo test --locked
 
-      - name: Clippy (advisory)
-        # 先不加 `-D warnings`：这条门禁从没在本仓跑过，Linux 上的告警集本地量不到；
-        # 一上来就升级成失败只会得到一条没人能从本地开始查的红灯。跑出干净结果后再收严。
+      # 本轮（2026-10-19）已把 clippy 告警清零并实测 `cargo clippy --all-targets -- -D warnings` rc=0，
+      # 于是按原注释里写的条件（「跑出干净结果后再收严」）把它转成硬门禁。
+      # 为什么要硬门禁：advisory 形态下 clippy 从来没真正挡过任何东西 ——
+      # 告警照出、流水线照绿，等于没有门禁。
+      # 诚实说明风险：CI 用 `dtolnay/rust-toolchain@stable`，stable 升级会带进**新的 lint**
+      # （本轮就撞上 Rust 1.98 新增的 `clippy::doc_lazy_continuation`），
+      # 那时 CI 会红 —— 这是刻意的：宁可因为工具链前进而红，也不要悄悄漂移。
+      - name: Clippy (warnings are errors)
         working-directory: src-tauri
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      # fmt 门禁此前**根本不存在**（仓库里有 rustfmt，但没有哪条流水线检查过它）。
+      # 格式差异与平台无关，本地就能量 ⇒ 可以安全地加成硬门禁。
+      - name: Format check
+        working-directory: src-tauri
+        run: cargo fmt --all --check

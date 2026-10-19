@@ -12,7 +12,7 @@
  *    都会被浏览器丢弃(见 HOST_REPLY_TARGET_ORIGIN); 泄露面为零 — 只回给已核验
  *    source 的那个 frame, 内容仅为该插件自己的 RPC 结果。
  */
-import type { ZBizApi } from "./api";
+import type { ZBizApi } from "./api-gate.ts";
 // 这里必须带 `.ts` 后缀: 本文件是 node --experimental-strip-types 直接加载的
 // 测试依赖链上的一环, node 不做扩展名补全。tsconfig 的
 // allowImportingTsExtensions 已显式允许, vite 也能正常解析。
@@ -22,6 +22,7 @@ import {
   isMethodPermitted,
   type PermissionSet,
 } from "./permissions.ts";
+import { DEFAULT_PLUGIN_API, HOST_API_VERSION } from "./api-version.ts";
 
 /** 沙箱权限: 不含 allow-same-origin, 保证插件文档为不透明源 */
 export const PLUGIN_SANDBOX = "allow-scripts allow-forms allow-modals allow-popups";
@@ -71,11 +72,29 @@ export const ALLOWED_METHODS: readonly BridgeMethodName[] = [
 
 export interface HelloRequest {
   __zbiz_hello: 1;
+  /**
+   * 插件侧的 zBiz 协议版本(台账 T2.2)。
+   *
+   * **可选**: 老插件不发送这个字段, 宿主按 DEFAULT_PLUGIN_API 处理。
+   * 刻意不在这里做版本裁决 —— 裁决发生在 scanner 加载插件时
+   * (见 api-version.ts 的 checkApiCompatibility), 握手期只做记录。
+   */
+  apiVersion?: string;
 }
 
 export interface ReadyResponse {
   __zbiz_ready: 1;
   pluginId: string;
+  /**
+   * 宿主支持的 zBiz 协议版本(台账 T2.2)。
+   * 插件据此知道自己能不能用上某些能力。
+   */
+  hostApiVersion: string;
+  /**
+   * 宿主实际授予这个插件的权限名列表。
+   * 让插件能自查"我到底拿到了什么", 而不是靠猜。
+   */
+  granted: string[];
 }
 
 export interface RpcRequest {
@@ -96,12 +115,16 @@ export type BridgeMessage = ReadyResponse | RpcResponse;
 
 const MSG_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-export function helloMessage(): HelloRequest {
-  return { __zbiz_hello: 1 };
+export function helloMessage(apiVersion: string = DEFAULT_PLUGIN_API): HelloRequest {
+  return { __zbiz_hello: 1, apiVersion };
 }
 
-export function readyMessage(pluginId: string): ReadyResponse {
-  return { __zbiz_ready: 1, pluginId };
+export function readyMessage(
+  pluginId: string,
+  hostApiVersion: string = HOST_API_VERSION,
+  granted: string[] = [],
+): ReadyResponse {
+  return { __zbiz_ready: 1, pluginId, hostApiVersion, granted };
 }
 
 export function responseMessage(id: string, result: unknown, error?: string): RpcResponse {
@@ -144,6 +167,20 @@ function withinByteBudget(value: unknown): boolean {
 /** 握手包解析: 只认 {__zbiz_hello:1} */
 export function parseHello(data: unknown): boolean {
   return isRecord(data) && data.__zbiz_hello === 1;
+}
+
+/**
+ * 从握手包里读插件声明的协议版本。
+ *
+ * 读不到(老插件 / 没写 / 写了非字符串) ⇒ 返回 null, 由调用方按
+ * DEFAULT_PLUGIN_API 处理。**不抛错**: 握手期不是裁决期。
+ */
+export function helloApiVersion(data: unknown): string | null {
+  if (!isRecord(data) || data.__zbiz_hello !== 1) return null;
+  const v = data.apiVersion;
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t ? t : null;
 }
 
 /**

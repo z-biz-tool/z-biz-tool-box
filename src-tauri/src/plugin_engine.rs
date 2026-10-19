@@ -42,7 +42,40 @@ pub struct HttpSecurity {
 }
 
 #[tauri::command]
-pub fn http_request(
+pub async fn http_request(
+    url: String,
+    method: String,
+    body: Option<String>,
+    headers: Option<HashMap<String, String>>,
+    security: Option<HttpSecurity>,
+) -> HttpResponse {
+    // 台账 T2.8: 这条命令原先是**同步**的, reqwest::blocking 会在调用它的
+    // 线程上一直等到响应回来(最长 30s)。Tauri 的 command 同步执行时占的是
+    // 主线程 —— 也就是说一次慢请求能把整个应用卡住 30 秒(窗口白屏、托盘无响应)。
+    //
+    // 现在改成 async command + spawn_blocking: 阻塞的网络 IO 挪到 blocking
+    // 线程池, 异步运行时立刻拿到 Future, 主线程不被占。
+    let insecure = security.as_ref().map(|s| s.insecure).unwrap_or(false);
+    tauri::async_runtime::spawn_blocking(move || {
+        http_request_blocking(url, method, body, headers, security)
+    })
+    .await
+    .unwrap_or_else(|e| HttpResponse {
+        status: 0,
+        status_text: "Task Failed".into(),
+        headers: HashMap::new(),
+        body: String::new(),
+        elapsed_ms: 0,
+        url: String::new(),
+        method: String::new(),
+        success: false,
+        error: Some(format!("HTTP 任务失败: {e}")),
+        insecure,
+    })
+}
+
+/// 真正干活的同步实现 —— 由 `http_request` 放进 blocking 线程池调用。
+fn http_request_blocking(
     url: String,
     method: String,
     body: Option<String>,
@@ -175,12 +208,7 @@ mod tests {
     #[test]
     fn 缺省即校验证书_显式声明才放宽() {
         assert!(!HttpSecurity::default().insecure, "缺省不得关闭证书校验");
-        assert!(
-            !HttpSecurity {
-                insecure: false
-            }
-            .insecure
-        );
+        assert!(!HttpSecurity { insecure: false }.insecure);
         // 放宽只能是显式且逐次的
         assert!(HttpSecurity { insecure: true }.insecure);
     }
@@ -214,6 +242,25 @@ mod tests {
             json.contains("\"insecure\":true"),
             "序列化后必须带出该标记: {}",
             json
+        );
+    }
+
+    /// 台账 T2.8 的回归护栏: 这条命令**必须**是 async 且必须走 spawn_blocking。
+    ///
+    /// 为什么用源码断言而不是行为断言: "不阻塞主线程"这件事没法在单元测试里
+    /// 直接测(要真起一个慢服务 + 观察主线程)。但"有人把它改回同步"是极可能
+    /// 发生的改动(同步写起来更短), 而它一改, 30s 卡死主线程的 bug 就回来了。
+    /// 源码断言能在 CI 里第一时间把这类回退按住。
+    #[test]
+    fn http_request_必须是异步命令_且走_spawn_blocking() {
+        let src = include_str!("plugin_engine.rs");
+        assert!(
+            src.contains("pub async fn http_request"),
+            "http_request 必须声明为 async, 否则慢请求会卡住主线程(台账 T2.8)"
+        );
+        assert!(
+            src.contains("spawn_blocking"),
+            "阻塞的 reqwest 调用必须放进 spawn_blocking, 不能直接跑在 command 线程上"
         );
     }
 }

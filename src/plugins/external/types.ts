@@ -53,6 +53,16 @@ export interface ExternalPluginManifest {
    * 权限取值见 permissions.ts。
    */
   permissions?: string[];
+  /**
+   * 插件使用的 zBiz 桥接协议版本(台账 T2.1)。
+   *
+   * - 不写 ⇒ 按 `"1"` 处理(向后兼容, 见 api-version.ts 的 DEFAULT_PLUGIN_API)
+   * - 写得比宿主新 ⇒ 加载时直接拒绝, 并说明"请升级宿主"
+   * - 写得比宿主老 ⇒ 走兼容档
+   *
+   * 刻意用字符串: 协议版本是"接口世代", 不是发行版本。
+   */
+  zbizApi?: string;
 }
 
 /**
@@ -68,6 +78,11 @@ export interface ExternalPlugin extends ExternalPluginManifest {
   logoUrl?: string;
   /** 加载时错误,如果有 */
   error?: string;
+  /**
+   * 解析后的 zBiz 协议版本(台账 T2.1)。
+   * manifest 没写时等于 DEFAULT_PLUGIN_API("1")。
+   */
+  zbizApi?: string;
 }
 
 // =====================================================================
@@ -105,6 +120,13 @@ export interface MarketPluginEntry {
   size?: number;
   /** ISO 8601 */
   updatedAt?: string;
+  /**
+   * `main.html` 文件字节的 SHA-256（小写十六进制）。
+   *
+   * - 有：安装器下载后必须比对，不一致**拒绝安装**（05 台账 T1.5）
+   * - 无：按台账的降级条款「警告但不阻断」（旧源灰度期），但界面必须如实标记未校验
+   */
+  sha256?: string;
   /**
    * 远程 icon URL(http(s))。客户端直接 `<img src={icon} />` 加载。
    * - 有: 卡片 banner 显示图片

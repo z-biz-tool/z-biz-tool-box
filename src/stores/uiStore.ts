@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import type { MarketList, MarketSource } from "../plugins/external/types";
+import { UI_STORE_VERSION, migrateUiState } from "./persistMigrate.ts";
 
 export type ThemeMode = "light" | "dark";
 
@@ -137,6 +138,23 @@ interface UiState {
    */
   marketSources: MarketSource[];
 
+  /**
+   * 是否允许**关闭 TLS 证书校验**(台账 T1.1)。
+   *
+   * 缺省 false —— 证书校验是默认状态, 放宽必须是用户显式做的决定。
+   * 开启后 HTTP 测试工具会多出一个「忽略证书校验」勾选框,
+   * 且每次请求的响应都会标黄提示"本次未校验证书"。
+   */
+  allowInsecureCerts: boolean;
+
+  /**
+   * 是否允许**明文 http 市场源**(台账 T1.6)。
+   *
+   * 缺省 false —— 市场源默认只接受 HTTPS。
+   * 开启后界面会用红色警告标出 http 源, 提醒内容可被中间人替换。
+   */
+  allowInsecureSources: boolean;
+
   toggleTheme: () => void;
   setTheme: (t: ThemeMode) => void;
 
@@ -162,6 +180,11 @@ interface UiState {
   renameMarketSource: (id: string, label: string) => void;
   setMarketSourceCache: (id: string, list: MarketList) => void;
   setMarketSourceError: (id: string, error: string) => void;
+
+  /** 打开/关闭「允许不安全连接(不校验 TLS 证书)」 */
+  setAllowInsecureCerts: (v: boolean) => void;
+  /** 打开/关闭「允许不安全市场源(http 明文)」 */
+  setAllowInsecureSources: (v: boolean) => void;
 }
 
 /** 生成简短的本地唯一 id(无外部依赖) */
@@ -179,6 +202,8 @@ export const useUiStore = create<UiState>()(
       toolStates: {},
       disabled: [],
       marketSources: [],
+      allowInsecureCerts: false,
+      allowInsecureSources: false,
 
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setTheme: (t) => set({ theme: t }),
@@ -264,10 +289,22 @@ export const useUiStore = create<UiState>()(
             m.id === id ? { ...m, lastError: error } : m
           ),
         })),
+
+      // ---- 安全开关 ----
+      setAllowInsecureCerts: (v) => set({ allowInsecureCerts: v }),
+      setAllowInsecureSources: (v) => set({ allowInsecureSources: v }),
     }),
     {
       name: PERSIST_KEY,
       storage: createJSONStorage(() => createPersistStorage()),
+      // 持久化结构版本 + 迁移(台账 T4.9)。
+      // version 写在这里 ⇒ 老数据(无 version 字段)被当作 v0, 走 migrate 补齐
+      // 新增字段的缺省值; 缺省一律 false(安全的一侧)。
+      version: UI_STORE_VERSION,
+      migrate: (persisted, version) => {
+        const { state } = migrateUiState(persisted, version);
+        return state as never;
+      },
       partialize: (s) => ({
         theme: s.theme,
         starred: s.starred,
@@ -280,6 +317,9 @@ export const useUiStore = create<UiState>()(
         disabled: s.disabled,
         // 市场源完整持久化(配置 + 最近一次成功缓存,下次启动省一次 fetch)
         marketSources: s.marketSources,
+        // 安全开关也持久化: 用户开过就是开过, 每次启动再问一遍很烦
+        allowInsecureCerts: s.allowInsecureCerts,
+        allowInsecureSources: s.allowInsecureSources,
       }),
     }
   )

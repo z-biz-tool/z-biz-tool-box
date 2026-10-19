@@ -3,6 +3,7 @@ import { Switch, Select, InputNumber, Divider, Typography, Button, message } fro
 import { ArrowLeftOutlined, ReloadOutlined, ClearOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useTheme } from "./ThemeContext";
+import { useUiStore } from "../stores/uiStore";
 
 interface PreferencesViewProps {
   onBack: () => void;
@@ -58,6 +59,12 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const { mode, setMode } = useTheme();
   const [msgApi, contextHolder] = message.useMessage();
+  // 安全开关(台账 T1.1 / T1.6)存在 uiStore 里 —— 与插件市场、HTTP 工具共用同一份,
+  // 避免"设置页开着的开关, 别的界面看不到"这类不一致。
+  const allowInsecureCerts = useUiStore((s) => s.allowInsecureCerts);
+  const setAllowInsecureCerts = useUiStore((s) => s.setAllowInsecureCerts);
+  const allowInsecureSources = useUiStore((s) => s.allowInsecureSources);
+  const setAllowInsecureSources = useUiStore((s) => s.setAllowInsecureSources);
 
   // 写入 prefs 后立即同步到对应系统
   useEffect(() => {
@@ -201,6 +208,25 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
               checked={prefs.altSpaceToToggle}
               onChange={(v) => update("altSpaceToToggle", v)}
             />
+          </Row>
+        </Section>
+
+        <Divider style={{ margin: "20px 0" }} />
+
+        <Section title="安全">
+          <Row label="允许不安全连接">
+            <Switch
+              checked={allowInsecureCerts}
+              onChange={setAllowInsecureCerts}
+            />
+            <Hint text="关闭 TLS 证书校验（内网自签证书调试用）。开启后 HTTP 测试工具才会出现「忽略证书校验」勾选框，且默认不勾。" />
+          </Row>
+          <Row label="允许不安全市场源">
+            <Switch
+              checked={allowInsecureSources}
+              onChange={setAllowInsecureSources}
+            />
+            <Hint text="放行 http 明文市场源。开启后界面会用红色警告标出这类源 —— 源返回的插件代码可被中间人替换。" />
           </Row>
         </Section>
 

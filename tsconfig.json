@@ -21,9 +21,14 @@
       "@/*": ["src/*"]
     }
   },
-  // 注意: tests **故意不在** include 里 —— 本仓没有 @types/node, 把测试
-  // 纳入类型检查会引入 node:test 的解析错误。
-  // 因此"漏传 perms 就报错"这条保护不能只靠类型检查, parseRpc 里另有运行期
-  // 守卫兜底(见 bridge-protocol.ts 的 assertPermsProvided)。
-  "include": ["src"]
+  // tests 与 scripts **纳入**类型检查。
+  // 之前它们被排除在外, 理由是"本仓没有 @types/node, 把测试纳入检查会引入
+  // node:test 的解析错误" —— 现在补了 @types/node(devDependency, 纯类型包,
+  // 零运行时), 这个理由不再成立。
+  //
+  // 为什么值得改: 测试是判据, 判据自己写错(参数签名不对、类型不匹配)时
+  // 不会被发现, 于是"测试全绿"变成了假信号。实测里就有过
+  // "漏传 perms 就报错"这条保护在测试里根本不受类型检查"的先例 ——
+  // 那条保护只能在运行期靠 assertPermsProvided 兜底。
+  "include": ["src", "tests", "scripts"]
 }

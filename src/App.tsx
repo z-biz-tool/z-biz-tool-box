@@ -3,7 +3,7 @@ import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
 import { useUiStore } from "./stores/uiStore";
@@ -264,9 +264,13 @@ export default function App() {
             onClose={hideWindow}
           >
             {active.kind === "builtin" && activeTool ? (
-              activeTool.render()
+              <ErrorBoundary onBack={() => setActiveKey("spotlight")}>
+                {activeTool.render()}
+              </ErrorBoundary>
             ) : active.kind === "external" && extPlugin ? (
-              <PluginIframe plugin={extPlugin} />
+              <ErrorBoundary onBack={() => setActiveKey("spotlight")}>
+                <PluginIframe plugin={extPlugin} />
+              </ErrorBoundary>
             ) : (
               <EmptyState title="工具未加载" description="外部插件可能已被移除" />
             )}

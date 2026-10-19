@@ -19,7 +19,6 @@ import {
   isMethodPermitted,
   noPermissions,
   permissionFor,
-  permissionForCommand,
   resolvePermissions,
 } from "../src/plugins/external/permissions.ts";
 import {

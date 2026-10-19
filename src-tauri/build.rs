@@ -52,9 +52,9 @@ fn codegen_brothers() -> Vec<BrotherSeed> {
 
 #[derive(Debug)]
 struct BrotherSeed {
-    key: String,        // "worker" — tray id 后缀 + GitHub repo 后缀共用
-    name: String,       // 仓名 "z-biz-tool-worker"
-    bundle_id: String,  // "com.zifang.z-biz-tool-worker"
+    key: String,          // "worker" — tray id 后缀 + GitHub repo 后缀共用
+    name: String,         // 仓名 "z-biz-tool-worker"
+    bundle_id: String,    // "com.zifang.z-biz-tool-worker"
     display_name: String, // "AI 任务看板"
 }
 
@@ -62,6 +62,7 @@ struct BrotherSeed {
 /// - `product`          主力 Tauri 产品
 /// - `product-local`    本地计算类(cpu/math)，装机后同样是带 bundle_id 的桌面 .app
 /// - `product-electron` Electron 产品(pet)，同理可探测可拉起
+///
 /// 刻意排除 `library` / `capability` / `meta`：它们没有可启动的桌面产物。
 const SUMMONABLE_TYPES: [&str; 3] = ["product", "product-local", "product-electron"];
 
@@ -90,12 +91,12 @@ fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => continue, // 没 bundle_id 召唤无意义
         };
-        let purpose = r
-            .get("purpose")
-            .and_then(|x| x.as_str())
-            .unwrap_or(&name);
+        let purpose = r.get("purpose").and_then(|x| x.as_str()).unwrap_or(&name);
         let display_name = display_label(purpose, &name);
-        let key = name.strip_prefix("z-biz-tool-").unwrap_or(&name).to_string();
+        let key = name
+            .strip_prefix("z-biz-tool-")
+            .unwrap_or(&name)
+            .to_string();
         out.push(BrotherSeed {
             key,
             name,
@@ -131,12 +132,7 @@ fn looks_like_slug(s: &str) -> bool {
 ///   ASCII hyphen "-" 三种空格组合、英文冒号 ":"
 fn first_segment(p: &str) -> String {
     let mut candidates: Vec<(usize, &str)> = Vec::new();
-    for sep in [
-        " — ", " —", "— ",
-        " – ", " –",
-        " - ", " -", "- ",
-        ":",
-    ] {
+    for sep in [" — ", " —", "— ", " – ", " –", " - ", " -", "- ", ":"] {
         if let Some(idx) = p.find(sep) {
             candidates.push((idx, sep));
         }
@@ -186,7 +182,11 @@ fn stage_brother_icons(entries: &[BrotherSeed]) {
             .join("src-tauri/icons/32x32.png");
         println!("cargo:rerun-if-changed={}", src.display());
         if !src.is_file() {
-            println!("cargo:warning=兄弟 {} 无 32x32.png（{}），面板用首字母色块", e.name, src.display());
+            println!(
+                "cargo:warning=兄弟 {} 无 32x32.png（{}），面板用首字母色块",
+                e.name,
+                src.display()
+            );
             continue;
         }
         if fs::copy(&src, dir.join(format!("{}.png", e.key))).is_err() {

@@ -153,13 +153,13 @@ fn fetch_latest(repo: &str) -> BrotherRelease {
         Err(e) => return unreachable_state(&format!("解析响应失败: {e}")),
     };
 
-    let tag = v.get("tag_name").and_then(|x| x.as_str()).map(str::to_string);
+    let tag = v
+        .get("tag_name")
+        .and_then(|x| x.as_str())
+        .map(str::to_string);
     let version = tag.as_deref().map(strip_v);
     let empty = Vec::new();
-    let assets = v
-        .get("assets")
-        .and_then(|x| x.as_array())
-        .unwrap_or(&empty);
+    let assets = v.get("assets").and_then(|x| x.as_array()).unwrap_or(&empty);
 
     // 优先 .app.tar.gz:解包即 .app,少一步 hdiutil 挂载
     let picked = assets
@@ -216,7 +216,11 @@ fn no_published_release(repo: &str) -> BrotherRelease {
             .map(|arr| {
                 arr.iter()
                     .filter(|x| x.get("draft").and_then(|d| d.as_bool()) == Some(true))
-                    .filter_map(|x| x.get("tag_name").and_then(|t| t.as_str()).map(str::to_string))
+                    .filter_map(|x| {
+                        x.get("tag_name")
+                            .and_then(|t| t.as_str())
+                            .map(str::to_string)
+                    })
                     .collect()
             })
             .unwrap_or_default(),
@@ -287,7 +291,9 @@ pub fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String>
             .iter()
             .zip(handles)
             .map(|(b, h)| {
-                let release = h.join().unwrap_or_else(|_| unreachable_state("查询线程崩溃"));
+                let release = h
+                    .join()
+                    .unwrap_or_else(|_| unreachable_state("查询线程崩溃"));
                 let installed = b.installed_path.is_some();
                 let has_update = match (&b.installed_version, &release.version) {
                     (Some(iv), Some(rv)) => version_gt(rv, iv),
@@ -302,8 +308,7 @@ pub fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String>
                     installed_path: b.installed_path.as_ref().map(|p| p.display().to_string()),
                     installed_version: b.installed_version.clone(),
                     has_update,
-                    icon_png: crate::brother_tools::icon_png(&b.key)
-                        .map(base64_encode),
+                    icon_png: crate::brother_tools::icon_png(&b.key).map(base64_encode),
                     release,
                 }
             })
@@ -322,14 +327,7 @@ pub fn install_brother(app: AppHandle, key: String) -> Result<(), String> {
 
     tauri::async_runtime::spawn_blocking(move || {
         if let Err(e) = install_inner(&app, &seed) {
-            emit_progress(
-                &app,
-                &seed.key,
-                "error",
-                None,
-                None,
-                Some(e.clone()),
-            );
+            emit_progress(&app, &seed.key, "error", None, None, Some(e.clone()));
             eprintln!("[z-biz] install {} 失败: {e}", seed.key);
         }
     });
@@ -694,7 +692,10 @@ mod tests {
                     .find(|a| asset_name(a).is_some_and(|n| n.ends_with("_aarch64.dmg")))
             })
             .unwrap();
-        assert_eq!(asset_name(picked).unwrap(), "z-biz-tool-worker_aarch64.app.tar.gz");
+        assert_eq!(
+            asset_name(picked).unwrap(),
+            "z-biz-tool-worker_aarch64.app.tar.gz"
+        );
 
         let x64_only = serde_json::json!([{"name": "x_0.1.0_x64.dmg", "size": 1}]);
         let arr = x64_only.as_array().unwrap();

@@ -38,7 +38,7 @@ import {
   WifiOutlined,
 } from "@ant-design/icons";
 import { useUiStore } from "../stores/uiStore";
-import { fetchMarketSource, validateMarketUrl } from "../plugins/external/market";
+import { fetchMarketSource, isInsecureMarketUrl, validateMarketUrl } from "../plugins/external/market";
 import type { MarketSource } from "../plugins/external/types";
 
 export interface MarketSourceManagerProps {
@@ -54,6 +54,9 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
   const renameMarketSource = useUiStore((s) => s.renameMarketSource);
   const setMarketSourceCache = useUiStore((s) => s.setMarketSourceCache);
   const setMarketSourceError = useUiStore((s) => s.setMarketSourceError);
+  // 台账 T1.6: 市场源默认只允许 HTTPS; http 明文源需要用户显式放行。
+  const allowInsecureSources = useUiStore((s) => s.allowInsecureSources);
+  const setAllowInsecureSources = useUiStore((s) => s.setAllowInsecureSources);
 
   const [newUrl, setNewUrl] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -65,7 +68,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
   const handleAdd = async () => {
     let safeUrl: string;
     try {
-      safeUrl = validateMarketUrl(newUrl);
+      safeUrl = validateMarketUrl(newUrl, { allowInsecure: allowInsecureSources });
     } catch (e) {
       message.error(`URL 不合法: ${(e as Error).message}`);
       return;
@@ -78,7 +81,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
     setRefreshing((m) => ({ ...m, [id]: true }));
     const src = useUiStore.getState().marketSources.find((s) => s.id === id);
     if (src) {
-      const r = await fetchMarketSource(src);
+      const r = await fetchMarketSource(src, { allowInsecure: allowInsecureSources });
       if (r.ok) setMarketSourceCache(id, r.list);
       else setMarketSourceError(id, r.error);
     }
@@ -88,7 +91,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
 
   const handleRefresh = async (src: MarketSource) => {
     setRefreshing((m) => ({ ...m, [src.id]: true }));
-    const r = await fetchMarketSource(src);
+    const r = await fetchMarketSource(src, { allowInsecure: allowInsecureSources });
     if (r.ok) {
       setMarketSourceCache(src.id, r.list);
       message.success(`${src.label ?? new URL(src.url).hostname} 拉取成功,${r.list.plugins.length} 个插件`);
@@ -118,6 +121,29 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
             按 <Typography.Text code>docs/market-spec.md</Typography.Text> v1.0 规范解析。
             支持多个源并行, 已连接源里的插件可一键下载到本地。
           </span>
+        }
+      />
+
+      <Alert
+        type={allowInsecureSources ? "warning" : "info"}
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={
+          <Space wrap>
+            <span>
+              {allowInsecureSources
+                ? "已允许 http 明文市场源 —— 源返回的内容可被中间人替换, 装上的插件代码不可信。"
+                : "市场源默认只接受 HTTPS。http 明文源需要显式放行。"}
+            </span>
+            <Switch
+              size="small"
+              checked={allowInsecureSources}
+              onChange={setAllowInsecureSources}
+            />
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              允许 http 明文源
+            </Typography.Text>
+          </Space>
         }
       />
 
@@ -242,6 +268,11 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
                       {s.lastError && (
                         <Typography.Text type="danger" style={{ fontSize: 12 }}>
                           <ExclamationCircleOutlined /> {s.lastError}
+                        </Typography.Text>
+                      )}
+                      {isInsecureMarketUrl(s.url) && (
+                        <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                          <ExclamationCircleOutlined /> 不安全源：http 明文传输, 内容可被中间人替换
                         </Typography.Text>
                       )}
                       {s.cachedList?.description && (

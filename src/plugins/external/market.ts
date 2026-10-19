@@ -19,6 +19,7 @@
 
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import type { MarketList, MarketPluginEntry, MarketSource } from "./types";
+import { isInsecureMarketUrl, MarketUrlError, validateMarketUrl } from "./market-security.ts";
 
 /** 拉取超时(ms) */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -27,32 +28,11 @@ const FETCH_TIMEOUT_MS = 10_000;
 // URL 校验
 // =====================================================================
 
-export class MarketUrlError extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = "MarketUrlError";
-  }
-}
-
-/**
- * 校验 base URL 是否可接受,并去掉末尾的 "/" 便于拼接。
- * - http:// 和 https:// 均可 (内网/本地联调友好)
- * - 不能是 file:// / data: / blob: 等
- */
-export function validateMarketUrl(url: string): string {
-  const v = url.trim();
-  if (!v) throw new MarketUrlError("URL 不能为空");
-  let parsed: URL;
-  try {
-    parsed = new URL(v);
-  } catch {
-    throw new MarketUrlError("不是合法的 URL");
-  }
-  if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-    return parsed.toString().replace(/\/+$/, "");
-  }
-  throw new MarketUrlError(`不支持的协议: ${parsed.protocol}`);
-}
+// URL 判定放在 market-security.ts(纯逻辑, 不依赖 Tauri, 可在 node 里直接断言)。
+// 这里只是转出去, 保证调用方 import 本文件时拿到的是**同一个**类 ——
+// instanceof 判断依赖类身份, 两处各写一份类会让 e instanceof MarketUrlError 永远为 false。
+export { MarketUrlError, validateMarketUrl, isInsecureMarketUrl };
+export type { MarketUrlOptions } from "./market-security.ts";
 
 // =====================================================================
 // URL 拼接工具
@@ -272,10 +252,16 @@ export type FetchResult = FetchOk | FetchErr;
 /**
  * 拉取并校验单个市场源。
  * 永远不抛异常 — 返回 { ok, list | error } 便于 UI 直接展示。
+ *
+ * @param opts.allowInsecure 是否放行 http 明文源(来自用户的「允许不安全市场源」开关)。
+ *   缺省 false ⇒ http 源直接被拒, 连请求都不发。
  */
-export async function fetchMarketSource(source: MarketSource): Promise<FetchResult> {
+export async function fetchMarketSource(
+  source: MarketSource,
+  opts: { allowInsecure?: boolean } = {},
+): Promise<FetchResult> {
   try {
-    const base = validateMarketUrl(source.url);
+    const base = validateMarketUrl(source.url, { allowInsecure: opts.allowInsecure === true });
     const url = listUrl(base);
     const resp = await tauriFetch(url, {
       method: "GET",

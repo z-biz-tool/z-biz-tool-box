@@ -9,12 +9,15 @@ import {
   Row,
   Col,
   Statistic,
+  Checkbox,
+  Alert,
   message,
   Divider,
 } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useToolState } from "../../_shared";
+import { useUiStore } from "../../stores/uiStore";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "http",
@@ -38,6 +41,8 @@ interface Response {
   body: string;
   time: number;
   size: number;
+  /** 本次请求是否关闭了 TLS 证书校验(后端回带的标记) */
+  insecure?: boolean;
 }
 
 export default function HttpTester() {
@@ -49,6 +54,11 @@ export default function HttpTester() {
   const [body, setBody] = useToolState("http", "body", "");
   const [response, setResponse] = useState<Response | null>(null);
   const [loading, setLoading] = useState(false);
+  // 台账 T1.1: 证书校验默认开着; 只有用户在设置里放开了"允许不安全连接",
+  // 这里才多出这个勾选框, 且默认仍是**不勾**。
+  // 也就是说: 放宽需要两步(设置里开 + 这里勾), 而不是一步到位。
+  const allowInsecureCerts = useUiStore((s) => s.allowInsecureCerts);
+  const [insecure, setInsecure] = useToolState("http", "insecure", false);
 
   const send = async () => {
     if (!url) {
@@ -58,12 +68,15 @@ export default function HttpTester() {
     setLoading(true);
     setResponse(null);
     try {
-      // 走 Rust 后端 — 支持 30s timeout + 强制忽略证书验证
+      // 走 Rust 后端 — 支持 30s timeout。
+      // 证书校验默认开启(后端改动前这里是硬编码忽略证书的, 现已改成
+      // 缺省校验 + 逐次显式声明才放宽)。
       const headerObj: Record<string, string> = {};
       headers.forEach((h) => {
         if (h.key) headerObj[h.key] = h.value;
       });
 
+      const useInsecure = allowInsecureCerts === true && insecure === true;
       const resp = await invoke<{
         status: number;
         statusText: string;
@@ -72,11 +85,13 @@ export default function HttpTester() {
         elapsed_ms: number;
         success: boolean;
         error?: string;
+        insecure?: boolean;
       }>("http_request", {
         url,
         method,
         body: method !== "GET" && method !== "HEAD" ? body || null : null,
         headers: Object.keys(headerObj).length > 0 ? headerObj : null,
+        security: { insecure: useInsecure },
       });
 
       setResponse({
@@ -86,6 +101,7 @@ export default function HttpTester() {
         body: resp.body,
         time: resp.elapsed_ms,
         size: new Blob([resp.body]).size,
+        insecure: resp.insecure === true,
       });
       message.success(`请求完成: ${resp.status}`);
     } catch (e) {
@@ -151,6 +167,26 @@ export default function HttpTester() {
           {loading ? "请求中..." : "发送"}
         </Button>
       </Space.Compact>
+
+      {allowInsecureCerts && (
+        <Space style={{ marginBottom: 12 }} size="small">
+          <Checkbox
+            checked={insecure === true}
+            onChange={(e) => setInsecure(e.target.checked)}
+          >
+            忽略 TLS 证书校验（本次请求不校验证书，响应内容不可信）
+          </Checkbox>
+        </Space>
+      )}
+
+      {response?.insecure && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="本次请求未校验 TLS 证书 —— 响应内容可能被中间人替换，不可信。"
+        />
+      )}
 
       <Card size="small" type="inner" title="请求头" style={{ marginBottom: 12 }}>
         {headers.map((h, i) => (

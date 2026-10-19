@@ -214,6 +214,8 @@ npm run tauri dev
 
 如果想不重启 app 就能装/卸插件, 见 [`external-plugin.md`](./external-plugin.md) — 用户从市场装到本地 `~/.z-biz-tools/plugins/<id>/`, app 通过 `<iframe src=…>` 加载, 主应用注入 `window.zBiz` 受限 API。
 
+⚠️ **外部插件默认拒绝**: 不在 `plugin.json` 的 `permissions` 里声明的能力一律被拒(错误带 `PermissionDenied` 前缀); 读剪贴板与发网络请求**首次调用**还会弹用户的确认框。写外部插件前先读 [`external-plugin.md` 的「权限模型」](./external-plugin.md#权限模型必读)与「协议握手与版本协商」两节。
+
 ---
 
 ## 7. 常见坑

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Space } from "antd";
+import { Alert, Button, Modal, Space, Typography } from "antd";
 import { ReloadOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { buildZbizApi } from "./api";
 import {
@@ -16,10 +16,25 @@ import {
 } from "./bridge-protocol";
 import { openPluginsDir } from "./scanner";
 import { describeUnknown, resolvePermissions } from "./permissions.ts";
+import { HOST_API_VERSION } from "./api-version.ts";
+import {
+  describePrompt,
+  isSensitiveMethod,
+  promptKey,
+  type PromptAnswer,
+} from "./permission-prompt.ts";
+import { usePromptStore } from "../../stores/promptStore";
 import type { ExternalPlugin } from "./types";
 
 interface PluginIframeProps {
   plugin: ExternalPlugin;
+}
+
+interface PendingPrompt {
+  key: string;
+  title: string;
+  body: string;
+  resolve: (answer: PromptAnswer) => void;
 }
 
 /**
@@ -40,13 +55,18 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // 敏感能力确认弹窗(台账 T2.6)
+  const [pending, setPending] = useState<PendingPrompt | null>(null);
+  const promptEvaluate = usePromptStore((s) => s.evaluate);
+  const promptRecord = usePromptStore((s) => s.record);
 
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    const api = buildZbizApi(plugin.id);
     // 该插件的权限来自它自己的 plugin.json; 没写就是只拿到隐式档。
     const perms = resolvePermissions(plugin);
+    // API 表面按权限裁剪(台账 T1.9): 被拒的方法在 api-gate 层就拿不到能力。
+    const api = buildZbizApi(plugin.id, perms);
     const takeToken = createBudget();
     const post = (msg: BridgeMessage) => {
       try {
@@ -55,12 +75,20 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         /* iframe 可能已卸载, 忽略 */
       }
     };
+    const ready = () => post(readyMessage(plugin.id, HOST_API_VERSION, [...perms.granted]));
 
-    const onMessage = (ev: MessageEvent) => {
+    // 敏感能力确认: 规则在 permission-prompt.ts, 这里只负责把"问"变成
+    // 一个能被 await 的 Promise(弹窗在 React 树里渲染, 不在 iframe 里)。
+    const askPermission = (key: string, title: string, body: string): Promise<PromptAnswer> =>
+      new Promise<PromptAnswer>((resolve) => {
+        setPending({ key, title, body, resolve });
+      });
+
+    const onMessage = async (ev: MessageEvent) => {
       // 不透明源下 ev.origin 恒为 "null", 只有窗口句柄能把消息绑定到这个 frame
       if (ev.source !== iframe.contentWindow) return;
       if (parseHello(ev.data)) {
-        post(readyMessage(plugin.id));
+        ready();
         return;
       }
       const rpc = parseRpc(ev.data, perms);
@@ -80,10 +108,39 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         post(responseMessage(rpc.id, undefined, "zBiz 桥接: 调用过于频繁"));
         return;
       }
-      Promise.resolve()
-        .then(() => dispatchBridgeMethod(api, rpc.method, rpc.args))
-        .then((result) => post(responseMessage(rpc.id, result)))
-        .catch((e) => post(responseMessage(rpc.id, undefined, e instanceof Error ? e.message : String(e))));
+
+      // 敏感能力首次调用确认(台账 T2.6)
+      const cmd = rpc.method === "invoke" ? String(rpc.args[0] ?? "") : undefined;
+      if (isSensitiveMethod(rpc.method, cmd)) {
+        const key = promptKey(plugin.id, rpc.method, cmd);
+        let outcome = promptEvaluate(key);
+        if (outcome === "ask") {
+          const answer = await askPermission(
+            key,
+            "插件请求使用敏感能力",
+            describePrompt(rpc.method, cmd),
+          );
+          promptRecord(key, answer);
+          outcome = answer === "deny" ? "deny" : "allow";
+        }
+        if (outcome === "deny") {
+          post(
+            responseMessage(
+              rpc.id,
+              undefined,
+              "PermissionDenied: 用户拒绝了该敏感操作。如需继续, 请在宿主里重新允许。",
+            ),
+          );
+          return;
+        }
+      }
+
+      try {
+        const result = await dispatchBridgeMethod(api, rpc.method, rpc.args);
+        post(responseMessage(rpc.id, result));
+      } catch (e) {
+        post(responseMessage(rpc.id, undefined, e instanceof Error ? e.message : String(e)));
+      }
     };
     window.addEventListener("message", onMessage);
 
@@ -93,18 +150,23 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         setError("iframe.contentWindow 不可访问");
         return;
       }
-      post(readyMessage(plugin.id));
+      ready();
     };
     iframe.addEventListener("load", onLoad);
     return () => {
       iframe.removeEventListener("load", onLoad);
       window.removeEventListener("message", onMessage);
     };
-  }, [plugin.id, reloadKey]);
+  }, [plugin.id, reloadKey, promptEvaluate, promptRecord]);
 
   // 声明了但宿主不认识的权限名: 几乎都是拼写错误, 静默忽略会让作者以为
   // 权限已生效, 所以直接在界面上说出来。
   const permissionNotice = describeUnknown(resolvePermissions(plugin));
+
+  const answerPrompt = (answer: PromptAnswer) => {
+    pending?.resolve(answer);
+    setPending(null);
+  };
 
   if (plugin.error) {
     return (
@@ -187,6 +249,32 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         }}
         sandbox={PLUGIN_SANDBOX}
       />
+
+      <Modal
+        open={pending !== null}
+        title={pending?.title ?? ""}
+        onCancel={() => answerPrompt("deny")}
+        maskClosable={false}
+        footer={
+          <Space>
+            <Button danger onClick={() => answerPrompt("deny")}>
+              拒绝
+            </Button>
+            <Button onClick={() => answerPrompt("allow")}>允许</Button>
+            <Button type="primary" onClick={() => answerPrompt("always")}>
+              始终允许
+            </Button>
+          </Space>
+        }
+      >
+        <Typography.Paragraph style={{ marginBottom: 4 }}>
+          插件 <code>{plugin.name}</code> 请求使用敏感能力:
+        </Typography.Paragraph>
+        <Typography.Paragraph type="warning">{pending?.body}</Typography.Paragraph>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          「允许」「拒绝」只在本次运行内生效;「始终允许」会记住这个决定。
+        </Typography.Text>
+      </Modal>
     </div>
   );
 }

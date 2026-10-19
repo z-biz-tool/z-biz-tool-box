@@ -185,5 +185,47 @@ check(
   realParseRpc({ ...bare, method: "readFile" }, PERMS) === null,
 );
 
+// ---- 8. 接线: 逻辑对但没接上, 单测照样全绿 ----
+// 上面所有断言验的是"模块的行为"。这一节验的是"模块之间接上了"——
+// 例如 buildZbizApi 若忘了把权限集传进去, api-gate 的门禁就形同虚设,
+// 而 api-gate 自己的单测仍然是全绿的。
+const apiSrc = readFileSync(join(here, "../src/plugins/external/api.ts"), "utf-8");
+const apiCodeOnly = apiSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+check(
+  "api.ts 用 buildGatedApi 裁剪 API 表面",
+  /buildGatedApi\(/.test(apiCodeOnly),
+);
+check(
+  "buildZbizApi 的权限集是必填参数(漏传就编译不过)",
+  /export function buildZbizApi\(pluginId: string, perms: PermissionSet\)/.test(apiCodeOnly),
+);
+check(
+  "PluginIframe 调用 buildZbizApi 时把权限集传进去了",
+  /buildZbizApi\(plugin\.id, perms\)/.test(codeOnly),
+);
+check(
+  "PluginIframe 用 resolvePermissions 解析该插件的权限",
+  /resolvePermissions\(plugin\)/.test(codeOnly),
+);
+check(
+  "ready 包带出 hostApiVersion 与 granted",
+  /readyMessage\(plugin\.id, HOST_API_VERSION, \[\.\.\.perms\.granted\]\)/.test(codeOnly),
+);
+check(
+  "敏感能力确认接线了(isSensitiveMethod 被用到)",
+  /isSensitiveMethod\(/.test(codeOnly),
+);
+check(
+  "敏感能力确认走 promptStore 而不是各处自建状态",
+  /usePromptStore/.test(codeOnly),
+);
+check(
+  "market.ts 的 URL 判定走 market-security(单一出处)",
+  /from "\.\/market-security\.ts"/.test(
+    readFileSync(join(here, "../src/plugins/external/market.ts"), "utf-8"),
+  ),
+);
+
 console.log(failed === 0 ? "\nALL CHECKS PASSED" : `\n${failed} CHECK(S) FAILED`);
 process.exit(failed === 0 ? 0 : 1);

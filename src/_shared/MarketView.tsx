@@ -20,8 +20,10 @@ import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir, uninstallLocalPlugin } from "../plugins/external/scanner";
 import { useUiStore } from "../stores/uiStore";
 import { DragHandle } from "./DragHandle";
-import { isNewer } from "../plugins/external/market";
-import { installRemotePlugin } from "../plugins/external/installer";
+import { isInsecureMarketUrl, isNewer } from "../plugins/external/market";
+import { fetchRemoteManifest, installRemotePlugin } from "../plugins/external/installer";
+import { buildInstallPlan } from "../plugins/external/install-plan";
+import { useInstallConfirm } from "./InstallConfirm";
 import type { MarketSource, MarketPluginEntry } from "../plugins/external/types";
 
 // 渐变色定义
@@ -64,6 +66,8 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   const extLoading = useExtStore((s) => s.loading);
   const extRefresh = useExtStore((s) => s.refresh);
   const marketSources = useUiStore((s) => s.marketSources);
+  const allowInsecureSources = useUiStore((s) => s.allowInsecureSources);
+  const { request: confirmInstall, modal: installConfirmModal } = useInstallConfirm();
   const disabled = useUiStore((s) => s.disabled);
   const healthySources = marketSources.filter(
     (s) => s.enabled && s.cachedList && !s.lastError
@@ -154,6 +158,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   }, [marketSources, installedExtMap]);
 
   // 装/更新远程插件
+  // 台账 T1.7: 确认在**下载主文件之前** —— 先取 manifest(权限在里面), 用户确认后才下载。
   const handleInstall = async (
     source: MarketSource,
     entry: MarketPluginEntry,
@@ -161,7 +166,21 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   ) => {
     setInstalling(key);
     try {
-      await installRemotePlugin(source, entry);
+      const manifest = await fetchRemoteManifest(source, entry, {
+        allowInsecure: allowInsecureSources,
+      });
+      const plan = buildInstallPlan({
+        entry,
+        manifest,
+        sourceUrl: source.url,
+        insecureSource: isInsecureMarketUrl(source.url),
+      });
+      const confirmed = await confirmInstall(plan);
+      if (!confirmed) {
+        message.info("已取消安装");
+        return;
+      }
+      await installRemotePlugin(source, entry, manifest, { allowInsecure: allowInsecureSources });
       message.success(`已安装 ${entry.name}`);
       await extRefresh();
     } catch (e) {
@@ -283,6 +302,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   );
 
   return (
+    <>
     <div
       style={{
         height: "100vh",
@@ -1591,5 +1611,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         />
       </div>
     </div>
+    {installConfirmModal}
+    </>
   );
 }

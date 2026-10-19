@@ -42,6 +42,8 @@
   "author": "your-name",
   "main": "main.html",
   "logo": "logo.png",
+  "zbizApi": "1",
+  "permissions": ["log", "notify", "storage"],
   "features": [
     {
       "code": "feature-1",
@@ -64,6 +66,68 @@
   - `code`: feature 唯一 code
   - `explain`: 搜索列表显示
   - `cmds`: 触发关键词 (可选)
+- `zbizApi`: **可选**。你用的 zBiz 桥接协议版本(见「协议握手与版本协商」)。不写按 `"1"` 处理
+- `permissions`: **可选但关键**。你申请的权限(见下一节)。不写 = 只拿到隐式档
+
+---
+
+## 权限模型（**必读**）
+
+宿主**默认拒绝**。你的 `plugin.json` 没写 `permissions` 时，插件只能拿到三个**隐式**权限:
+
+| 权限 | 含义 | 是否隐式 |
+| --- | --- | --- |
+| `log` | 写宿主 console | ✅ 隐式 |
+| `notify` | 弹宿主 toast | ✅ 隐式 |
+| `storage` | 读写**自己的**私有 KV | ✅ 隐式 |
+| `clipboard.write` | 写系统剪贴板 | ❌ 需声明 |
+| `clipboard.read` | **读**系统剪贴板（会读到验证码/密码） | ❌ 需声明 |
+| `window.control` | 隐藏/显示/聚焦主窗口 | ❌ 需声明 |
+| `http` | 经 `http_request` 发起网络请求（可访问内网） | ❌ 需声明 |
+| `invoke` | 调用宿主后端命令 | ❌ 需声明 |
+
+**规则**:
+
+1. **默认拒绝**。没声明的能力调用时会被拒, 拿到的错误文本里带 `PermissionDenied`
+   并点名要补哪一条 —— 照着补就行。
+2. **`invoke` 是两层权限**。声明了 `invoke` 只代表"可以调后端命令";
+   `http_request` 还要额外的 `http`。两个都声明才能发网络请求。
+3. **用户会看到你的权限清单**。装插件前会弹一个确认框, 列出你申请的每一条权限。
+   申请得越多, 用户越可能拒绝 —— 只申请你真用得上的。
+4. **拼错的权限名不会生效**, 宿主会在界面上报出来（多半是 `clipboard.read` 写成了
+   `clipboard.reads`）。`permissions` 里非字符串的项会被忽略, 不会让插件整个加载失败。
+
+示例（要读剪贴板 + 发网络请求 + 调后端）:
+
+```json
+{
+  "permissions": ["clipboard.read", "invoke", "http"]
+}
+```
+
+> ⚠️ **敏感能力首次调用会被用户确认**（见下节）。即使你声明了权限,
+> 用户在**第一次**调用时仍会被问一次。
+
+---
+
+## 协议握手与版本协商
+
+宿主与插件之间有一套明确的握手, 插件的 `bootstrap` 必须遵守:
+
+```
+插件 → 宿主: { __zbiz_hello: 1, apiVersion: "1" }
+宿主 → 插件: { __zbiz_ready: 1, pluginId, hostApiVersion: "1", granted: ["log", "notify", ...] }
+```
+
+- `apiVersion` 是**你**声明的协议版本(取自 `plugin.json` 的 `zbizApi`, 缺省 `"1"`)
+- `hostApiVersion` 是**宿主**支持的协议版本
+- `granted` 是宿主**实际授予你**的权限名列表 —— 可以拿它自查, 别靠猜
+
+**版本不兼容时插件不会被加载**。若你声明的 `zbizApi` 主版本比宿主新,
+宿主会在插件列表里标出「请升级宿主」, 而不是让你在运行到一半时炸掉。
+
+`hostApiVersion` 与 `granted` 是本轮新增的字段。老宿主不返回它们时,
+你的代码要能容错（当成 `undefined`）。
 
 ---
 
@@ -202,15 +266,74 @@ console.log(r); // { ok, status, body }
 window.zBiz.log('clicked at', Date.now());
 ```
 
+### 权限不足时是什么样
+
+被拒的方法**不会消失**, 而是返回一个带 `PermissionDenied` 前缀的错误。
+这样你不用猜"是不是 API 变了":
+
+```js
+const r = await window.zBiz.readClipboard();
+if (!r.ok) {
+  // r.error 形如:
+  // "PermissionDenied: zBiz 权限不足：该插件的 plugin.json 未声明 "clipboard.read"，已拒绝 readClipboard。"
+  showTip(r.error);
+}
+```
+
+`invoke` 这类没有 `{ ok, error }` 信封的方法则直接抛 `Error`, 消息里同样带
+`PermissionDenied` 前缀。
+
+---
+
+## 敏感能力首次调用会被用户确认
+
+以下两个能力**即使你声明了权限**, 用户在**第一次**调用时仍会被问一次:
+
+| 能力 | 风险 |
+| --- | --- |
+| `readClipboard` | 会读走剪贴板里的验证码 / 密码 / 地址 |
+| `invoke("http_request", …)` | 以用户名义发请求, 可访问内网服务 |
+
+用户看到的是「允许 / 拒绝 / 始终允许」三选一:
+
+- **允许** / **拒绝**: 只在本次运行内生效, 之后再调用不再问
+- **始终允许**: 记住这个决定, 跨会话生效
+
+所以**不要在页面加载时就去读剪贴板**——那会立刻弹窗, 体验很差。
+正确做法是让用户**先点一个按钮**:
+
+```js
+// ❌ 加载即读剪贴板 —— 会立刻弹确认框
+whenReady().then(zb => zb.readClipboard().then(r => fill(r.text)));
+
+// ✅ 用户点了才读
+document.getElementById('paste').onclick = async () => {
+  const r = await window.zBiz.readClipboard();
+  if (!r.ok) { showTip(r.error); return; }   // 用户选了"拒绝"
+  fill(r.text);
+};
+```
+
+被拒绝时你会收到 `PermissionDenied` 提示, 记得给用户一句可读的话, 别静默失败。
+
+---
+
 ### 禁止的事
 
 | ❌ | 原因 |
 | -- | ---- |
 | `fetch('http://other-domain')` | webview CORS 限制, 用 `invoke('http_request')` |
-| `localStorage` 跨 plugin 共享 | 用 `window.zBiz.storage` (plugin-scoped) |
+| `localStorage` 跨 plugin 共享 | 沙箱是**不透明源**（不含 `allow-same-origin`），`localStorage` 根本不可用；用 `window.zBiz.storage` (plugin-scoped) |
 | `window.parent.xxx` | iframe 沙箱隔离 |
+| `window.top` / `window.opener` | 沙箱隔离 |
 | `<script src="https://evil">` 注入外部 | 沙箱化但仍建议自己打包 |
 | `eval()` / `Function()` | 沙箱允许但污染全局, 慎用 |
+| 加载时就读剪贴板 / 发请求 | 会立刻触发用户的敏感能力确认框, 改成用户点击后再做 |
+
+> 沙箱属性是 `allow-scripts allow-forms allow-modals allow-popups` ——
+> **刻意不含 `allow-same-origin`**。所以你的文档处于不透明源:
+> 拿不到宿主的 cookie / localStorage / `asset://` 私有文件域, 也摘不掉自身 sandbox。
+> 需要跨会话存东西, 用 `window.zBiz.storage`。
 
 ---
 
@@ -279,9 +402,14 @@ my-plugin/
   "name": "Demo 插件",
   "description": "测试 zBiz API",
   "version": "1.0.0",
+  "zbizApi": "1",
+  "permissions": ["log", "notify", "storage", "clipboard.write"],
   "features": [{ "code": "demo", "explain": "演示按钮" }]
 }
 ```
+
+> `clipboard.write` 要声明才能用; `log` / `notify` / `storage` 是隐式档, 写了也不多余。
+> **不写** `permissions` 的话, 复制按钮会拿到 `PermissionDenied`。
 
 `main.html`:
 ```html

@@ -22,13 +22,9 @@ import {
   isAllowedMethod,
   parseHello,
   parseRpc as parseRpcWithPerms,
-  permissionDenial,
   responseMessage,
 } from "../src/plugins/external/bridge-protocol.ts";
-import {
-  allPermissions,
-  resolvePermissions,
-} from "../src/plugins/external/permissions.ts";
+import { allPermissions } from "../src/plugins/external/permissions.ts";
 
 /**
  * 本文件测**协议层**的白名单与结构校验, 权限不是本文件的主题,

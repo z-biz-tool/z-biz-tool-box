@@ -31,8 +31,10 @@ import { useUiStore } from "../../stores/uiStore";
 import { TOOL_GROUPS } from "../_registry";
 import { useExtStore } from "../external/store";
 import { openPluginsDir } from "../external/scanner";
-import { isNewer } from "../external/market";
-import { installRemotePlugin } from "../external/installer";
+import { isInsecureMarketUrl, isNewer } from "../external/market";
+import { fetchRemoteManifest, installRemotePlugin } from "../external/installer";
+import { buildInstallPlan } from "../external/install-plan";
+import { useInstallConfirm } from "../../_shared/InstallConfirm";
 import type { MarketPluginEntry, MarketSource } from "../external/types";
 import { MarketSourceManager } from "../../_shared/MarketSourceManager";
 
@@ -73,6 +75,8 @@ export default function PluginMarket() {
   const toggleDisabled = useUiStore((s) => s.toggleDisabled);
   const setDisabled = useUiStore((s) => s.setDisabled);
   const marketSources = useUiStore((s) => s.marketSources);
+  const allowInsecureSources = useUiStore((s) => s.allowInsecureSources);
+  const { request: confirmInstall, modal: installConfirmModal } = useInstallConfirm();
 
   const extPlugins = useExtStore((s) => s.plugins);
   const refreshExt = useExtStore((s) => s.refresh);
@@ -195,11 +199,32 @@ export default function PluginMarket() {
   ).length;
 
   // ---- 远程插件安装 ----
+  // 台账 T1.7: 确认在**下载主文件之前**。所以先只取 manifest(权限清单在里面),
+  // 算清单 → 用户确认 → 才下载 main.html。
   const handleInstall = async (item: RemoteItem) => {
     setInstalling(item.key);
     try {
-      const result = await installRemotePlugin(item.source, item.entry);
-      message.success(`已安装 ${item.entry.name} → ${result.pluginDir}`);
+      const manifest = await fetchRemoteManifest(item.source, item.entry, {
+        allowInsecure: allowInsecureSources,
+      });
+      const plan = buildInstallPlan({
+        entry: item.entry,
+        manifest,
+        sourceUrl: item.source.url,
+        insecureSource: isInsecureMarketUrl(item.source.url),
+      });
+      const confirmed = await confirmInstall(plan);
+      if (!confirmed) {
+        message.info("已取消安装");
+        return;
+      }
+      const result = await installRemotePlugin(item.source, item.entry, manifest, {
+        allowInsecure: allowInsecureSources,
+      });
+      message.success(
+        `已安装 ${item.entry.name} → ${result.pluginDir}` +
+          (result.hashVerified ? "" : "（市场源未提供 SHA-256，本次未做完整性校验）"),
+      );
       await refreshExt();
     } catch (e) {
       message.error(`安装失败: ${String(e)}`);
@@ -426,6 +451,7 @@ export default function PluginMarket() {
         open={sourceMgrOpen}
         onClose={() => setSourceMgrOpen(false)}
       />
+      {installConfirmModal}
     </>
   );
 }

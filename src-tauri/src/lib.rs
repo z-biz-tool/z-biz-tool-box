@@ -1,15 +1,19 @@
 mod brother_tools;
 mod commands;
 mod installer;
+mod logging;
 mod plugin_engine;
 mod tray;
 
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use tray::{create_tray, refresh_menu, GroupEntry, show_main_window, toggle_main_window};
+use tray::{create_tray, refresh_menu, show_main_window, toggle_main_window, GroupEntry};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // panic hook 要最先装: 后面任何一步 panic, 现场都还来得及落盘(台账 T4.7)
+    logging::install_panic_hook();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -29,12 +33,14 @@ pub fn run() {
             installer::brother_overview,
             installer::install_brother,
             installer::launch_brother,
+            logging::write_log,
+            logging::log_dir_path,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
             #[cfg(target_os = "macos")]
             {
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
             // 启动时先建 tray:内置工具占位"加载中…"+ 兄弟应用清单(用兄弟全量初检一次,
@@ -43,11 +49,17 @@ pub fn run() {
             eprintln!(
                 "[z-biz] brother tools scanned: {} total, {} installed",
                 initial_brothers.len(),
-                initial_brothers.iter().filter(|b| b.installed_path.is_some()).count()
+                initial_brothers
+                    .iter()
+                    .filter(|b| b.installed_path.is_some())
+                    .count()
             );
             // 打出每个命中项解析到的实际路径: 召唤功能一旦"打开了错的 app",
             // 这行日志就是判断依据(macOS 上尤其要看清是 /Applications 还是构建产物)
-            for b in initial_brothers.iter().filter(|b| b.installed_path.is_some()) {
+            for b in initial_brothers
+                .iter()
+                .filter(|b| b.installed_path.is_some())
+            {
                 eprintln!(
                     "[z-biz]   ✓ {} → {}",
                     b.display_name,
@@ -71,10 +83,7 @@ pub fn run() {
             eprintln!("[z-biz] registered ⌥Space global shortcut");
 
             // 备用快捷键 ⌃⌘K (Ctrl+Cmd+K) — 不冲突,作为 alt+space 被抢的 fallback
-            let shortcut2 = Shortcut::new(
-                Some(Modifiers::CONTROL | Modifiers::SUPER),
-                Code::KeyK,
-            );
+            let shortcut2 = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SUPER), Code::KeyK);
             let app_handle2 = app.handle().clone();
             app.global_shortcut()
                 .on_shortcut(shortcut2, move |_app, _scut, event| {
@@ -105,10 +114,7 @@ pub fn run() {
 
 /// 前端 mount 时调用,把当前启用的工具分组推给 Rust 构建 tray 菜单
 #[tauri::command]
-fn register_tools(
-    app: tauri::AppHandle,
-    groups: Vec<GroupEntry>,
-) -> Result<(), String> {
+fn register_tools(app: tauri::AppHandle, groups: Vec<GroupEntry>) -> Result<(), String> {
     // 每次都重检兄弟状态:用户可能刚装/卸了另一个 app,
     // 我们的检测便宜(macOS mdfind 命中 Spotlight 索引,毫秒级)
     let brothers = brother_tools::all_brothers_with_state();
@@ -120,7 +126,10 @@ fn register_tools(
 #[tauri::command]
 fn refresh_brother_tools(app: tauri::AppHandle) -> Result<usize, String> {
     let brothers = brother_tools::all_brothers_with_state();
-    let installed = brothers.iter().filter(|b| b.installed_path.is_some()).count();
+    let installed = brothers
+        .iter()
+        .filter(|b| b.installed_path.is_some())
+        .count();
     // 当前 groups 怎么拿?暂用内置空组:完整路径下,前端会再 register_tools 一次,
     // 这里只刷兄弟,不影响分组
     let _ = refresh_menu(
@@ -142,7 +151,10 @@ fn get_state(app: tauri::AppHandle) -> Result<String, String> {
         let visible = w.is_visible().unwrap_or(false);
         let focused = w.is_focused().unwrap_or(false);
         let minimized = w.is_minimized().unwrap_or(false);
-        return Ok(format!("visible={} focused={} minimized={}", visible, focused, minimized));
+        return Ok(format!(
+            "visible={} focused={} minimized={}",
+            visible, focused, minimized
+        ));
     }
     Ok("(no main window)".into())
 }
@@ -193,7 +205,10 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let dir = home.join(".z-biz-tools").join("plugins").join(&id);
     if !dir.exists() {
         // 目录已不在 → 幂等: 不报错, 让前端 scanner 重新加载清掉 ext store 里的缓存条目
-        eprintln!("[z-biz] uninstall: dir already gone: {id} (path={})", dir.display());
+        eprintln!(
+            "[z-biz] uninstall: dir already gone: {id} (path={})",
+            dir.display()
+        );
         return Ok(());
     }
     std::fs::remove_dir_all(&dir).map_err(|e| format!("删除失败: {e}"))?;

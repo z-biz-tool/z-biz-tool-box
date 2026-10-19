@@ -9,3 +9,6 @@ export { PreferencesView } from "./PreferencesView";
 export { ShortcutsView } from "./ShortcutsView";
 export { BrothersView } from "./BrothersView";
 export { DragHandle } from "./DragHandle";
+export { ErrorBoundary } from "./ErrorBoundary";
+export { useInstallConfirm, InstallConfirmModal } from "./InstallConfirm";
+export { installFrontendErrorLogging, writeFrontendLog, formatError } from "./errorLogger";

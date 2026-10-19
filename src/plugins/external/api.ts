@@ -5,36 +5,23 @@
  *  - 显式列出,没有 access to Node / fs / network (除非显式 invoke 转发)
  *  - 通过 postMessage 走事件回调,避免 iframe.contentWindow 的循环引用
  *  - 所有错误返回 (而不是 throw),方便插件内 try/catch
+ *
+ * ## 权限裁剪在哪
+ *
+ * 本文件只提供**未裁剪**的真实实现; 按 manifest 声明的权限收窄 API 表面
+ * 由 `api-gate.ts` 的 `buildGatedApi` 完成(台账 T1.9)。
+ * 分成两个模块的原因: api-gate 必须是纯的 —— 它要在 node --test 里
+ * 被直接断言"被拒的方法绝不能碰到底层实现", 而本文件 import 了
+ * Tauri 与 antd, 在 node 里跑不起来。
  */
 import { invoke } from "@tauri-apps/api/core";
 import { writeText as clipboardWrite } from "@tauri-apps/plugin-clipboard-manager";
 import { message } from "antd";
 import { ALLOWED_INVOKE_COMMANDS } from "./bridge-protocol";
+import { buildGatedApi, type ZBizApi } from "./api-gate";
+import type { PermissionSet } from "./permissions.ts";
 
-export interface ZBizApi {
-  /** 复制文本到系统剪贴板 */
-  copyToClipboard: (text: string) => Promise<{ ok: boolean; error?: string }>;
-  /** 读取系统剪贴板 */
-  readClipboard: () => Promise<{ ok: boolean; text?: string; error?: string }>;
-  /** 显示通知(主应用级别 toast) */
-  notify: (msg: string) => void;
-  /** 调用 Tauri 后端命令(cmd 为任意字符串, 由下方白名单判定; 名单外直接抛错) */
-  invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
-  /** 简单 KV 存储(plugin-scoped,key 前缀自动加 plugin id) */
-  storage: {
-    get: (key: string) => Promise<string | null>;
-    set: (key: string, value: string) => Promise<void>;
-    remove: (key: string) => Promise<void>;
-  };
-  /** 插件自身 id(注入时绑定) */
-  pluginId: string;
-  /** 隐藏主窗口 */
-  hideMainWindow: () => Promise<void>;
-  /** 显示主窗口 */
-  showMainWindow: () => Promise<void>;
-  /** 日志(主应用 console + antd message) */
-  log: (...args: unknown[]) => void;
-}
+export type { ZBizApi };
 
 const STORAGE_PREFIX = "zBiz.plugin.";
 /** 转发的 Tauri 命令白名单(与协议层共用同一份) */
@@ -50,7 +37,14 @@ const byteLen = (v: unknown): number => {
   }
 };
 
-export function buildZbizApi(pluginId: string): ZBizApi {
+/**
+ * 构造某个插件拿到的 zBiz API。
+ *
+ * @param pluginId 插件 id
+ * @param perms    该插件的权限集(来自 resolvePermissions(plugin))。
+ *                 **必填**: 漏传会响亮地抛错, 绝不静默变成"全放行"。
+ */
+export function buildZbizApi(pluginId: string, perms: PermissionSet): ZBizApi {
   const storageKey = (k: string) => {
     if (typeof k !== "string" || !k || k.length > STORAGE_MAX_KEY_LEN || k.includes("\u0000")) {
       throw new Error(`zBiz.storage: 非法 key "${String(k).slice(0, 32)}"`);
@@ -58,7 +52,8 @@ export function buildZbizApi(pluginId: string): ZBizApi {
     return `${STORAGE_PREFIX}${pluginId}.${k}`;
   };
 
-  const api: ZBizApi = {
+  // 未裁剪的真实实现
+  const impl: ZBizApi = {
     pluginId,
     copyToClipboard: async (text) => {
       try {
@@ -140,6 +135,7 @@ export function buildZbizApi(pluginId: string): ZBizApi {
     },
     log: (...args) => console.log(`[${pluginId}]`, ...args),
   };
-  // 冻结: 桥接每次拿到的都是只读快照, 避免运行期被替换实现
-  return Object.freeze({ ...api, storage: Object.freeze(api.storage) });
+  // 按权限裁剪: 宿主真正交给这个插件的 API 表面。
+  // 裁剪发生在 buildGatedApi 里, 那里保证"被拒的方法绝不触碰 impl"。
+  return buildGatedApi(pluginId, perms, impl);
 }
