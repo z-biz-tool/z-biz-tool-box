@@ -104,12 +104,12 @@ fn detect_one(bundle_id: &str, _name: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let _ = bundle_id;
-        return detect_windows(_name);
+        detect_windows(_name)
     }
     #[cfg(target_os = "linux")]
     {
         let _ = bundle_id;
-        return detect_linux(_name);
+        detect_linux(_name)
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
