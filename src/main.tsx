@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import UpdaterGate from "./components/UpdaterDialog";
 import { installFrontendErrorLogging } from "./_shared/errorLogger";
 import "./index.css";
 
@@ -14,5 +15,6 @@ installFrontendErrorLogging();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
+    <UpdaterGate />
   </React.StrictMode>
 );
