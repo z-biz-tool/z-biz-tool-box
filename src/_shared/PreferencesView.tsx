@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Switch, Select, InputNumber, Divider, Typography, Button, message } from "antd";
-import { ArrowLeftOutlined, ReloadOutlined, ClearOutlined } from "@ant-design/icons";
+import { Switch, Select, InputNumber, Divider, Typography, Button, message, Space } from "antd";
+import { ArrowLeftOutlined, ReloadOutlined, ClearOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useTheme } from "./ThemeContext";
 import { useUiStore } from "../stores/uiStore";
@@ -59,6 +59,10 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const { mode, setMode } = useTheme();
   const [msgApi, contextHolder] = message.useMessage();
+  // 日志目录：前端报错会写进那里（Rust 的 write_log）⇒ 给出入口，
+  // 否则用户只能翻代码才知道日志在哪。
+  const [logDir, setLogDir] = useState<string | null>(null);
+  const [openingLogDir, setOpeningLogDir] = useState(false);
   // 安全开关(台账 T1.1 / T1.6)存在 uiStore 里 —— 与插件市场、HTTP 工具共用同一份,
   // 避免"设置页开着的开关, 别的界面看不到"这类不一致。
   const allowInsecureCerts = useUiStore((s) => s.allowInsecureCerts);
@@ -76,6 +80,19 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
       localStorage.removeItem("z-tool-theme");
     }
   }, [prefs, setMode]);
+
+  // 打开日志目录：Rust 侧用 tauri-plugin-opener 打开并把路径带回来
+  const openLogDir = async () => {
+    setOpeningLogDir(true);
+    try {
+      const dir = await invoke<string>("open_log_dir");
+      setLogDir(dir);
+    } catch (e) {
+      msgApi.error(`打开日志目录失败：${e}`);
+    } finally {
+      setOpeningLogDir(false);
+    }
+  };
 
   const update = <K extends keyof Prefs>(key: K, value: Prefs[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }));
@@ -265,6 +282,23 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
             <Typography.Text copyable={{ text: "https://github.com/z-biz/z-biz-tool-box" }}>
               z-biz/z-biz-tool-box
             </Typography.Text>
+          </Row>
+          <Row label="日志目录">
+            {/* 前端的 window.onerror / unhandledrejection 会写进这个目录
+                （Rust 的 write_log 命令）⇒ 用户找日志时得有个入口，
+                否则「日志在哪」只能靠翻代码。 */}
+            <Space>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {logDir ?? "（读取中…）"}
+              </Typography.Text>
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={openLogDir}
+                loading={openingLogDir}
+              >
+                打开目录
+              </Button>
+            </Space>
           </Row>
           <Row label="重置全部">
             <Button icon={<ReloadOutlined />} onClick={reset}>

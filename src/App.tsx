@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool } from "./tools";
+import { pushTrayTools } from "./trayBridge";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
@@ -37,10 +38,36 @@ export default function App() {
   const [activeKey, setActiveKey] = useState<string>("spotlight");
   const [sourceMgrOpen, setSourceMgrOpen] = useState(false);
   const pushRecent = useUiStore((s) => s.pushRecent);
+  const disabledTools = useUiStore((s) => s.disabled);
   const extPlugins = useExtStore((s) => s.plugins);
 
   useEffect(() => {
     initExtStore();
+  }, []);
+
+  // ── tray 菜单接线（2026-10-25）────────────────────────────────────
+  //
+  // Rust 侧 `register_tools` 的注释一直写着「前端 mount 时调用」，
+  // 但前端**从来没调过** ⇒ tray 菜单里永远是 Rust 侧的占位组「加载中…」。
+  // 而且 Rust 点菜单项会 emit("select-tool", key)，前端也**从没监听** ⇒
+  // 就算菜单里有条目，点下去也不会切到对应工具。
+  // ⇒ box 的菜单栏入口整条链是断的，这里把两段都接上。
+  useEffect(() => {
+    void pushTrayTools(disabledTools);
+  }, [disabledTools]);
+  // Rust tray 点某个工具 → 切到那个工具
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<string>("select-tool", (e) => {
+      const key = e.payload;
+      if (!key) return;
+      setActiveKey(key);
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   // Rust tray 点未装兄弟那一行 → 直接进面板并高亮那张卡

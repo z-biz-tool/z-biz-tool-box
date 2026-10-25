@@ -16,6 +16,7 @@ import {
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { pushTrayTools } from "../trayBridge";
 import { DragHandle } from "./DragHandle";
 
 type ReleaseState =
@@ -104,6 +105,9 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
           return next;
         });
         void load(false);
+        // 装完兄弟应用后 tray 的「兄弟应用」子菜单要跟着更新 ——
+        // 那份清单是 Rust 侧扫出来的,前端不推一次它就一直显示装之前的状态。
+        void pushTrayTools();
         msgApi.success("安装完成");
       }
       if (p.phase === "error") {

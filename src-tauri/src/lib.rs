@@ -1,5 +1,4 @@
 mod brother_tools;
-mod commands;
 mod installer;
 mod logging;
 mod plugin_engine;
@@ -23,9 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
-            commands::greet,
             register_tools,
-            refresh_brother_tools,
             plugin_engine::http_request,
             get_state,
             apply_window_prefs,
@@ -34,7 +31,7 @@ pub fn run() {
             installer::install_brother,
             installer::launch_brother,
             logging::write_log,
-            logging::log_dir_path,
+            logging::open_log_dir,
         ])
         .setup(|app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
@@ -113,35 +110,17 @@ pub fn run() {
 }
 
 /// 前端 mount 时调用,把当前启用的工具分组推给 Rust 构建 tray 菜单
+///
+/// **2026-10-25 接线**：这个命令以前**前端一次都没调过** ⇒ tray 菜单里
+/// 永远是 Rust 侧的占位组「加载中…」（`create_tray` 在 groups 为空时就建那个占位），
+/// 而且前端也**没监听** Rust 发的 `select-tool` ⇒ 点菜单项连窗口都不会切工具。
+/// ⇒ box 的菜单栏入口整条链是断的。现在前端 mount 时推分组、并监听 `select-tool`。
 #[tauri::command]
 fn register_tools(app: tauri::AppHandle, groups: Vec<GroupEntry>) -> Result<(), String> {
     // 每次都重检兄弟状态:用户可能刚装/卸了另一个 app,
     // 我们的检测便宜(macOS mdfind 命中 Spotlight 索引,毫秒级)
     let brothers = brother_tools::all_brothers_with_state();
     refresh_menu(&app, &groups, &brothers).map_err(|e| e.to_string())
-}
-
-/// 手动触发兄弟应用重扫:用户在主面板按"重新扫描"时调用,
-/// 或者兄弟状态变了(`emit("brothers-changed")` 之类的扩展点)
-#[tauri::command]
-fn refresh_brother_tools(app: tauri::AppHandle) -> Result<usize, String> {
-    let brothers = brother_tools::all_brothers_with_state();
-    let installed = brothers
-        .iter()
-        .filter(|b| b.installed_path.is_some())
-        .count();
-    // 当前 groups 怎么拿?暂用内置空组:完整路径下,前端会再 register_tools 一次,
-    // 这里只刷兄弟,不影响分组
-    let _ = refresh_menu(
-        &app,
-        &[GroupEntry {
-            key: "_loading".into(),
-            label: "加载中…".into(),
-            tools: vec![],
-        }],
-        &brothers,
-    );
-    Ok(installed)
 }
 
 /// 测试命令: 只读, 返回主窗口当前状态

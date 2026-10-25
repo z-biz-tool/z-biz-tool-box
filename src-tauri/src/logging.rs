@@ -158,18 +158,27 @@ pub fn write_log(app: tauri::AppHandle, level: String, message: String) {
     let _ = &app;
 }
 
-/// 读出日志目录路径(给 UI 展示"日志在哪"用)
+/// 打开日志目录(系统文件管理器),返回目录路径供 UI 展示
+///
+/// **2026-10-25**：原来这里只有 `log_dir_path`(只返回路径)⇒ 前端**一次都没调过**
+/// ⇒ 用户看得见「前端在写日志」却找不到日志在哪。现在打开目录并把路径一并返回。
+///
+/// 用的是本仓**已经装好的** `tauri-plugin-opener`（不自己 spawn 系统命令 ⇒ 跨平台一致）。
 #[tauri::command]
-pub fn log_dir_path(app: tauri::AppHandle) -> Result<String, String> {
+pub fn open_log_dir(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
     let home = app
         .path()
         .home_dir()
         .map_err(|e| format!("home_dir 失败: {e}"))?;
-    Ok(home
-        .join(".z-biz-tools")
-        .join("logs")
-        .to_string_lossy()
-        .to_string())
+    let dir = home.join(".z-biz-tools").join("logs");
+    // 还没写过日志时目录可能不存在 ⇒ 先建出来,免得点了没反应
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.to_string_lossy().to_string();
+    app.opener()
+        .open_path(path.clone(), None::<&str>)
+        .map_err(|e| format!("打开日志目录失败: {e}"))?;
+    Ok(path)
 }
 
 /// 泛型包装: 让 `write_log` 在测试里也能被 `R: Runtime` 调用
