@@ -6,7 +6,7 @@
  * 所以 tray 的「未安装」那一行现在只是面板入口(见 tray.rs handle_brother_click)。
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Empty, Progress, Spin, Tag, Tooltip, Typography, message } from "antd";
 import {
   ArrowLeftOutlined,
@@ -16,6 +16,7 @@ import {
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { pushTrayTools } from "../trayBridge";
 import { DragHandle } from "./DragHandle";
 
@@ -77,6 +78,14 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
   const [cards, setCards] = useState<BrotherCard[] | null>(null);
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({});
   const [msgApi, contextHolder] = message.useMessage();
+  /** 拖文件进来时，指针悬在哪张卡上（用于高亮落点） */
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  /** 名字要用于提示文案，但拖放订阅不该因列表刷新而重建 ⇒ 走 ref */
+  const cardsRef = useRef<BrotherCard[] | null>(null);
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
 
   const load = useCallback(async (force: boolean) => {
     try {
@@ -147,6 +156,72 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
     }
   };
 
+  /**
+   * 把文件交给某个兄弟应用：带上 `zbiz://<key>/open?file=…` 启动。
+   *
+   * 这是 box 从「启动器」变成「交接中枢」的那一步 —— 以前 box 只能把应用叫起来，
+   * 用户还得自己在目标应用里再找一遍文件。
+   */
+  const launchWithFile = useCallback(
+    async (key: string, file: string) => {
+      const name = cardsRef.current?.find((c) => c.key === key)?.displayName ?? key;
+      const base = file.split(/[\\/]/).pop() ?? file;
+      try {
+        await invoke("launch_brother", { key, target: { file } });
+        msgApi.success(`已把「${base}」交给 ${name}`);
+      } catch (e) {
+        msgApi.error(`交给 ${name} 失败: ${e}`);
+      }
+    },
+    [msgApi],
+  );
+
+  // 拖文件到卡片上 → 用该应用打开。
+  // 位置是物理像素（Retina 上是 CSS 像素的 2 倍），elementFromPoint 要 CSS 像素，
+  // 不换算的话在 2x 屏上会指到角落，看着像「拖到哪儿都没反应」。
+  const keyAtPointer = useCallback((position: { x: number; y: number }): string | null => {
+    const dpr = window.devicePixelRatio || 1;
+    const el = document.elementFromPoint(position.x / dpr, position.y / dpr);
+    const host = el?.closest("[data-brother-key]");
+    return host instanceof HTMLElement ? host.dataset.brotherKey ?? null : null;
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const p = event.payload;
+        if (p.type === "enter" || p.type === "over") {
+          setDragKey(keyAtPointer(p.position));
+          return;
+        }
+        if (p.type === "drop") {
+          const key = keyAtPointer(p.position);
+          setDragKey(null);
+          const file = p.paths[0];
+          if (key && file) void launchWithFile(key, file);
+          return;
+        }
+        setDragKey(null);
+      })
+      .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
+        unlisten = u;
+      })
+      .catch((e) => {
+        // 纯浏览器预览没有拖放事件；桌面版失败只影响「拖文件交接」这一条捷径
+        console.warn("[box] 订阅拖放事件失败（非 Tauri 环境属预期）", e);
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [keyAtPointer, launchWithFile]);
+
   const installedCount = cards?.filter((c) => c.installed).length ?? 0;
   const updateCount = cards?.filter((c) => c.hasUpdate).length ?? 0;
 
@@ -193,6 +268,12 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
             {updateCount > 0 && ` · ${updateCount} 个可更新`}
           </Typography.Text>
         )}
+        {dragKey && (
+          <Typography.Text style={{ fontSize: 12, color: "var(--ant-color-primary)" }}>
+            松开即用「{cardsRef.current?.find((c) => c.key === dragKey)?.displayName ?? dragKey}
+            」打开
+          </Typography.Text>
+        )}
       </DragHandle>
 
       <div
@@ -221,6 +302,7 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
                 card={c}
                 progress={progress[c.key]}
                 highlighted={highlightKey === c.key}
+                dragTarget={dragKey === c.key}
                 onInstall={() => void install(c)}
                 onLaunch={() => void launch(c)}
               />
@@ -236,12 +318,15 @@ function BrotherTile({
   card,
   progress,
   highlighted,
+  dragTarget,
   onInstall,
   onLaunch,
 }: {
   card: BrotherCard;
   progress?: InstallProgress;
   highlighted: boolean;
+  /** 拖着文件悬在这张卡上：给一个比 hover 更明确的落点反馈 */
+  dragTarget: boolean;
   onInstall: () => void;
   onLaunch: () => void;
 }) {
@@ -253,7 +338,8 @@ function BrotherTile({
       : null;
 
   return (
-    <div id={`brother-${card.key}`}>
+    // data-brother-key 是拖放落点的唯一抓手：指针位置靠 elementFromPoint 反查它
+    <div id={`brother-${card.key}`} data-brother-key={card.key}>
       <Card
         size="small"
         hoverable={!busy}
@@ -261,6 +347,13 @@ function BrotherTile({
           borderRadius: 12,
           ...(highlighted
             ? { borderColor: "var(--ant-color-primary)", boxShadow: "0 0 0 2px rgba(99,102,241,0.18)" }
+            : {}),
+          ...(dragTarget
+            ? {
+                borderColor: "var(--ant-color-primary)",
+                borderStyle: "dashed",
+                background: "var(--ant-color-primary-bg, rgba(99,102,241,0.06))",
+              }
             : {}),
         }}
         styles={{ body: { padding: 14 } }}

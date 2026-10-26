@@ -1,10 +1,11 @@
 mod brother_tools;
+mod handoff;
 mod installer;
 mod logging;
 mod plugin_engine;
 mod tray;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tray::{create_tray, refresh_menu, show_main_window, toggle_main_window, GroupEntry};
 
@@ -16,12 +17,15 @@ pub fn run() {
     tauri::Builder::default()
         // 单实例（2026-10-26 分发底座）：第二次启动聚焦已有窗口，不再开新进程。
         // 必须作为第一个注册的插件（tauri-plugin-single-instance 官方要求）。
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
+            // 别的产品/脚本用 `zbiz://box/...` 唤起时，argv 就落在这里。
+            // 这是「已运行实例」这一半，冷启动那一半在 setup 里 seed。
+            push_handoffs(app, argv);
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -34,6 +38,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // 更新安装完成后的「立即重启」
         .plugin(tauri_plugin_process::init())
+        // 深链队列：冷启动 seed 与 second-instance 转发都写它
+        .manage(handoff::Pending::default())
         .invoke_handler(tauri::generate_handler![
             register_tools,
             plugin_engine::http_request,
@@ -43,6 +49,7 @@ pub fn run() {
             installer::brother_overview,
             installer::install_brother,
             installer::launch_brother,
+            handoff_take_pending,
             logging::write_log,
             logging::open_log_dir,
         ])
@@ -52,6 +59,10 @@ pub fn run() {
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
+
+            // 深链队列必须早于下面的 tray 构建：冷启动的 argv 要在任何 UI 之前收进来，
+            // 否则前端挂载后 take 一次会拿到空。
+            push_handoffs(app.handle(), std::env::args().skip(1).collect());
 
             // 启动时先建 tray:内置工具占位"加载中…"+ 兄弟应用清单(用兄弟全量初检一次,
             // 让菜单第一次弹出就显示真实可用状态,避免闪烁)
@@ -212,4 +223,34 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
 #[allow(dead_code)]
 fn _unused() {
     let _ = show_main_window::<tauri::Wry>;
+}
+
+// ── zbiz:// 深链接线 ──────────────────────────────────────────────────────
+
+/// 把 argv 里的深链塞进队列，并喊前端来取。
+///
+/// 两条触发共用它：冷启动（setup 里 seed 一次）与已运行实例
+/// （single-instance 回调把新进程的 argv 转进来）。
+fn push_handoffs(app: &tauri::AppHandle, argv: Vec<String>) {
+    let items = handoff::from_args(argv);
+    if items.is_empty() {
+        return;
+    }
+    for h in &items {
+        eprintln!(
+            "[z-biz] handoff 收到: zbiz://{}/{} params={:?}",
+            h.product, h.action, h.params
+        );
+    }
+    let added = app.state::<handoff::Pending>().push(items);
+    if added > 0 {
+        // 冷启动时前端还没挂监听，这条会丢——前端 mount 后主动 take 一次兜住。
+        let _ = app.emit(handoff::EVENT, ());
+    }
+}
+
+/// 前端把队列取空。取走即清空，所以「收到信号」和「启动时主动取」不会重复执行。
+#[tauri::command]
+fn handoff_take_pending(state: tauri::State<handoff::Pending>) -> Vec<handoff::Handoff> {
+    state.take()
 }

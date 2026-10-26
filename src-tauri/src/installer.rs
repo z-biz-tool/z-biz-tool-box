@@ -334,8 +334,23 @@ pub fn install_brother(app: AppHandle, key: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 「启动」按钮要带上的上下文。缺省启动不传（`target` 为 null），
+/// 传了就会构造一条 `zbiz://<key>/<action>?file=…&from=box` 递过去。
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchTarget {
+    /// 缺省 `open`
+    pub action: Option<String>,
+    /// 交接的主体文件。存在性在这里先校验一次：不校验的话目标应用收到一条
+    /// 指向不存在文件的深链，只能静默失败，用户无从知道是路径错了还是那应用不支持。
+    pub file: Option<String>,
+    /// 其余透传参数（如 `line`、`mode`），不做白名单——协议本身已校验字符集。
+    #[serde(default)]
+    pub params: std::collections::BTreeMap<String, String>,
+}
+
 #[tauri::command]
-pub fn launch_brother(key: String) -> Result<(), String> {
+pub fn launch_brother(key: String, target: Option<LaunchTarget>) -> Result<(), String> {
     let b = crate::brother_tools::all_brothers_with_state()
         .into_iter()
         .find(|b| b.key == key)
@@ -343,7 +358,26 @@ pub fn launch_brother(key: String) -> Result<(), String> {
     let path = b
         .installed_path
         .ok_or_else(|| format!("{} 未安装", b.display_name))?;
-    crate::brother_tools::launch(&path)
+
+    // 裸启动保持原样：走 `open <app>`，会激活已在跑的实例，不额外起进程。
+    let Some(target) = target else {
+        return crate::brother_tools::launch(&path);
+    };
+
+    let mut params = target.params;
+    if let Some(file) = target.file {
+        if !std::path::Path::new(&file).exists() {
+            return Err(format!("文件不存在: {file}"));
+        }
+        params.insert("file".to_string(), file);
+    }
+    // from 由发送方强制填写，不接受调用方伪造——否则目标应用无法区分是 box 召唤
+    // 还是别的产品转手过来的，回传结果时就会找错人。
+    params.insert("from".to_string(), "box".to_string());
+
+    let action = target.action.as_deref().unwrap_or("open");
+    let uri = crate::handoff::build(&b.key, action, &params)?;
+    crate::brother_tools::launch_uri(&path, &uri)
 }
 
 fn emit_progress(

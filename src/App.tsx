@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Tag, Typography, Button, Tooltip } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
@@ -15,6 +16,13 @@ import { radius, shadow, size, motion } from "./_shared/designTokens";
 
 /** tray 只推内置工具 ⇒ 可路由的 key 集合在模块加载时就固定 */
 const TOOL_KEYS = ALL_TOOLS.map((t) => t.key);
+
+/** Rust 侧 `handoff::Handoff` 的镜像（serde 默认字段名，不做 camelCase） */
+interface HandoffItem {
+  product: string;
+  action: string;
+  params: Record<string, string>;
+}
 
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
@@ -101,6 +109,55 @@ export default function App() {
         console.warn("[box] 订阅 open-brothers 失败（非 Tauri 环境属预期）", e);
       });
     return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  // ── zbiz:// 深链路由（2026-10-26）─────────────────────────────────
+  //
+  // 别的产品/脚本用 `zbiz://box/tool?key=<tool>` 唤起 box 时，Rust 把深链收进队列并
+  // emit("zbiz-open")。这里做两件事：
+  //   ① mount 时先 take 一次 —— 冷启动那条信号在监听挂上之前就发出去了，收不到；
+  //   ② 之后每次收到信号再 take，处理已运行实例被二次唤起的情况。
+  // take 是出队即清空，所以 ①② 同时发生也不会把同一条深链执行两遍。
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    const drain = async () => {
+      try {
+        const items = await invoke<HandoffItem[]>("handoff_take_pending");
+        for (const h of items) {
+          const key = h.params.key;
+          if (key && TOOL_KEYS.includes(key)) {
+            setActiveKey(key);
+            continue;
+          }
+          if (h.action === "open" && !key) {
+            // 只说要 box 但没点名的，回首页
+            setActiveKey("spotlight");
+            continue;
+          }
+          // 不认识的就留着日志 —— 静默吞掉会让「深链发了但没反应」无从排查
+          console.warn("[box] 收到未适配的深链", h);
+        }
+      } catch (e) {
+        console.warn("[box] 取深链队列失败（非 Tauri 环境属预期）", e);
+      }
+    };
+    void drain();
+    listen("zbiz-open", () => void drain())
+      .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
+        unlisten = u;
+      })
+      .catch((e) => {
+        console.warn("[box] 订阅 zbiz-open 失败（非 Tauri 环境属预期）", e);
+      });
+    return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);

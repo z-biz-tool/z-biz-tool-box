@@ -299,6 +299,26 @@ pub fn launch(path: &Path) -> Result<(), String> {
     spawn(path).map_err(|e| format!("spawn 失败: {e}"))
 }
 
+/// 带参数启动：把一条 `zbiz://` 深链作为 argv 递过去。
+///
+/// # 为什么 macOS 上不能用 `open <app> --args`
+///
+/// 实测语义：`open` 对**已经在跑**的实例只发一个 Reopen 事件，`--args` 根本不投递，
+/// 参数就这么静默消失了——从调用方看是「启动成功」，从用户看是「文件没打开」。
+/// 所以这里加 `-n` 强制起一个新进程，让各仓已接入的 `tauri-plugin-single-instance`
+/// 接住它：插件在 macOS 上是连 `/tmp/<identifier>_si.sock` 把 cwd+argv 写给在跑的实例，
+/// 然后自己 `exit(0)`。目标没在跑时，这个新进程就正常冷启动，argv 直接在
+/// `std::env::args()` 里。两条路都通，且不需要目标仓先注册 URL scheme。
+pub fn launch_uri(path: &Path, uri: &str) -> Result<(), String> {
+    if !path.exists() {
+        return Err(format!("路径不存在: {}", path.display()));
+    }
+    if !uri.starts_with("zbiz://") {
+        return Err(format!("不是 zbiz:// 深链: {uri}"));
+    }
+    spawn_with_arg(path, uri).map_err(|e| format!("spawn 失败: {e}"))
+}
+
 #[cfg(target_os = "macos")]
 fn spawn(path: &Path) -> std::io::Result<()> {
     use std::process::Command;
@@ -320,6 +340,116 @@ fn spawn(path: &Path) -> std::io::Result<()> {
     // 直接解析 .desktop 内部 Exec 也行,但需要 ini parser;xdg-open 已覆盖 99% 场景
     Command::new("xdg-open").arg(path).spawn()?;
     Ok(())
+}
+
+// ── 带参数启动 ────────────────────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+fn spawn_with_arg(path: &Path, arg: &str) -> std::io::Result<()> {
+    use std::process::Command;
+    // -n: 强制新进程（已运行实例才会收到 forwarded argv，见 launch_uri 的注释）
+    // -a: 按 .app 路径定位，不依赖 LaunchServices 的名字解析
+    Command::new("open")
+        .arg("-n")
+        .arg("-a")
+        .arg(path)
+        .arg("--args")
+        .arg(arg)
+        .spawn()?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn spawn_with_arg(path: &Path, arg: &str) -> std::io::Result<()> {
+    use std::process::Command;
+    // 直接起 exe：第二个进程会被 single-instance 插件的命名管道/窗口消息机制
+    // 转给在跑的实例后退出。命令行参数由操作系统原样保留引号，不需要额外转义。
+    Command::new(path).arg(arg).spawn()?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_with_arg(path: &Path, arg: &str) -> std::io::Result<()> {
+    use std::process::Command;
+    // xdg-open 只会「打开这个 .desktop 指向的应用」，递不进参数。
+    // 所以要自己读 Exec= 行：去掉 %f/%U 这类字段码，再把深链追加进去。
+    //
+    // ⚠️ 未在 Linux 实测：本机只有 macOS。字段码与引号的边界情况
+    // （Exec=env A=1 "app" --x 这类）按 freedesktop 规范处理，真机复跑后回填结论。
+    let argv = desktop_exec(path)?;
+    let (program, rest) = argv.split_first().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{} 里的 Exec= 是空的", path.display()),
+        )
+    })?;
+    Command::new(program).args(rest).arg(arg).spawn()?;
+    Ok(())
+}
+
+/// 读 .desktop 的 Exec= 行并切成 argv。只处理规范里最常见的两种形态：
+/// 双引号包裹的含空格路径，以及裸词。
+#[cfg(target_os = "linux")]
+fn desktop_exec(path: &Path) -> std::io::Result<Vec<String>> {
+    use std::io::{Error, ErrorKind};
+
+    let text = std::fs::read_to_string(path)?;
+    let raw = text
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("Exec="))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "桌面文件里没有 Exec= 行"))?;
+
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut quoted = false;
+    let mut escaped = false;
+    for ch in raw.chars() {
+        if escaped {
+            cur.push(ch);
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '"' => quoted = !quoted,
+            c if c.is_whitespace() && !quoted => {
+                if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            }
+            c => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+
+    // 字段码（%f %F %u %U %i %c %k %d 及 %%）是桌面环境占位用的，我们额外追加真实参数，
+    // 留着它们会让应用收到一个字面量 "%U"。
+    let strip_codes = |s: &str| -> String {
+        let mut r = String::new();
+        let mut it = s.chars().peekable();
+        while let Some(c) = it.next() {
+            if c == '%' {
+                if let Some(&n) = it.peek() {
+                    if n == '%' {
+                        it.next();
+                        r.push('%');
+                    } else {
+                        it.next(); // 丢掉字段码
+                    }
+                    continue;
+                }
+            }
+            r.push(c);
+        }
+        r
+    };
+    Ok(out
+        .into_iter()
+        .map(|t| strip_codes(&t))
+        .filter(|t| !t.is_empty())
+        .collect())
 }
 
 #[cfg(test)]
@@ -346,13 +476,23 @@ mod tests {
     }
 
     /// 版本号是更新检测的比对基准,读错会让面板一直报「可更新」或永远不报。
+    ///
+    /// 注意：**不要断言某个具体版本号**。这条测试读的是用户机器上真实装着的 app，
+    /// 装的是 0.2.0 还是 0.2.1 取决于用户装了什么，跟代码对不对无关。
+    /// （2026-10-26 实测：这里曾写死 0.2.1，/Applications 里换成 0.2.0 后测试就红了，
+    /// 而读 plist 的代码一行没改。）所以只断言「读得出、形状对、bundle id 对得上」。
     #[test]
     fn installed_version_from_real_app() {
         let app = Path::new("/Applications/z-biz-tool-note.app");
         if !app.is_dir() {
             return; // 本机没装就跳过,不编造断言
         }
-        assert_eq!(read_bundle_version(app).as_deref(), Some("0.2.1"));
+        let version = read_bundle_version(app).expect("已装的 note 必须读得出 CFBundleShortVersionString");
+        let parts: Vec<&str> = version.split('.').collect();
+        assert!(
+            parts.len() >= 2 && parts.iter().all(|p| !p.is_empty()),
+            "版本号形状不对: {version:?}"
+        );
         assert_eq!(
             read_bundle_id(app).as_deref(),
             Some("com.zifang.z-biz-tool-note")
