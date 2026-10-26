@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Modal, Space, Typography } from "antd";
+import { Alert, Button, Modal, Result, Skeleton, Space, Typography } from "antd";
 import { ReloadOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { buildZbizApi } from "./api";
 import {
@@ -14,6 +14,17 @@ import {
   responseMessage,
   type BridgeMessage,
 } from "./bridge-protocol";
+import {
+  createFrameLife,
+  describeFramePhase,
+  frameAlive,
+  frameFailed,
+  frameLoaded,
+  frameTimedOut,
+  FRAME_TIMEOUT_MS,
+  isFrameBlocked,
+  type FrameLife,
+} from "./iframe-lifecycle";
 import { openPluginsDir } from "./scanner";
 import { describeUnknown, resolvePermissions } from "./permissions.ts";
 import { HOST_API_VERSION } from "./api-version.ts";
@@ -55,10 +66,43 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // 台账 T3.6：加载中 / 已就绪 / 超时 / 加载失败 四相，判定在 iframe-lifecycle.ts
+  const [life, setLife] = useState<FrameLife>(() => createFrameLife(Date.now()));
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   // 敏感能力确认弹窗(台账 T2.6)
   const [pending, setPending] = useState<PendingPrompt | null>(null);
   const promptEvaluate = usePromptStore((s) => s.evaluate);
   const promptRecord = usePromptStore((s) => s.record);
+
+  const reload = () => setReloadKey((k) => k + 1);
+
+  /** 打开插件目录：失败要让用户看见（浏览器预览时没有该能力） */
+  const openDir = async () => {
+    try {
+      await openPluginsDir();
+    } catch (e) {
+      setError(
+        `打开插件目录失败：${e instanceof Error ? e.message : String(e)}（外部插件目录只有桌面版可访问）`
+      );
+    }
+  };
+
+  // 换插件 / 重新加载：回到 loading 并重置计时
+  useEffect(() => {
+    setLife(createFrameLife(Date.now()));
+    setError(null);
+    setNoticeDismissed(false);
+  }, [plugin.id, reloadKey]);
+
+  // 超时计时：只在 loading 相挂定时器，到点后由状态机决定是否推进
+  useEffect(() => {
+    if (life.phase !== "loading") return;
+    const timer = setTimeout(
+      () => setLife((s) => frameTimedOut(s, Date.now())),
+      FRAME_TIMEOUT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [life.phase, plugin.id, reloadKey]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -87,6 +131,8 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
     const onMessage = async (ev: MessageEvent) => {
       // 不透明源下 ev.origin 恒为 "null", 只有窗口句柄能把消息绑定到这个 frame
       if (ev.source !== iframe.contentWindow) return;
+      // 能发消息就说明页面脚本跑起来了 —— 比 load 更强的存活信号
+      setLife((s) => frameAlive(s));
       if (parseHello(ev.data)) {
         ready();
         return;
@@ -148,8 +194,10 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
     const onLoad = () => {
       if (!iframe.contentWindow) {
         setError("iframe.contentWindow 不可访问");
+        setLife((s) => frameFailed(s, "无法访问插件窗口（浏览器拒绝加载该地址）"));
         return;
       }
+      setLife((s) => frameLoaded(s));
       ready();
     };
     iframe.addEventListener("load", onLoad);
@@ -173,12 +221,12 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
       <Alert
         type="error"
         showIcon
-        message="插件加载失败"
+        title="插件加载失败"
         description={
           <Space direction="vertical" size="small" style={{ width: "100%" }}>
             <code style={{ color: "#ff7875" }}>{plugin.error}</code>
             <Space>
-              <Button size="small" icon={<FolderOpenOutlined />} onClick={openPluginsDir}>
+              <Button size="small" icon={<FolderOpenOutlined />} onClick={() => void openDir()}>
                 打开插件目录
               </Button>
             </Space>
@@ -189,6 +237,8 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
     );
   }
 
+  const phaseCopy = describeFramePhase(life.phase, FRAME_TIMEOUT_MS);
+
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
       {error && (
@@ -196,18 +246,18 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
           type="warning"
           showIcon
           closable
-          message={error}
+          title={error}
           onClose={() => setError(null)}
           style={{ margin: "8px 16px 0" }}
         />
       )}
-      {permissionNotice && (
+      {permissionNotice && !noticeDismissed && (
         <Alert
           type="warning"
           showIcon
           closable
-          message={permissionNotice}
-          onClose={() => setError(null)}
+          title={permissionNotice}
+          onClose={() => setNoticeDismissed(true)}
           style={{ margin: "8px 16px 0" }}
         />
       )}
@@ -224,37 +274,84 @@ export function PluginIframe({ plugin }: PluginIframeProps) {
         }}
       >
         <span>📦 外部插件 · {plugin.id} v{plugin.version}</span>
-        <Button
-          size="small"
-          type="text"
-          icon={<ReloadOutlined />}
-          onClick={() => setReloadKey((k) => k + 1)}
-        >
+        <Button size="small" type="text" icon={<ReloadOutlined />} onClick={reload}>
           重新加载
         </Button>
-        <Button size="small" type="text" icon={<FolderOpenOutlined />} onClick={openPluginsDir}>
+        <Button size="small" type="text" icon={<FolderOpenOutlined />} onClick={() => void openDir()}>
           打开目录
         </Button>
       </div>
-      <iframe
-        key={reloadKey}
-        ref={iframeRef}
-        src={plugin.mainUrl}
-        title={plugin.name}
-        style={{
-          flex: 1,
-          width: "100%",
-          border: "none",
-          background: "var(--ant-color-bg-layout)",
-        }}
-        sandbox={PLUGIN_SANDBOX}
-      />
+      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+        <iframe
+          key={reloadKey}
+          ref={iframeRef}
+          src={plugin.mainUrl}
+          title={plugin.name}
+          onError={() => setLife((s) => frameFailed(s))}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+            background: "var(--ant-color-bg-layout)",
+          }}
+          sandbox={PLUGIN_SANDBOX}
+        />
+
+        {/* 三态覆盖层（台账 T3.6）：loading 骨架 / 超时 / 加载失败。
+            覆盖层挡住半成品界面，但 iframe 仍在下面加载 —— 晚到的 load
+            会把状态机推回 ready，用户不必再点一次。 */}
+        {isFrameBlocked(life.phase) && (
+          <div
+            className="zBizScroll"
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 2,
+              overflow: "auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+              background: "var(--ant-color-bg-layout)",
+            }}
+          >
+            {life.phase === "loading" ? (
+              <div style={{ width: "min(520px, 100%)" }}>
+                <Skeleton active title paragraph={{ rows: 5 }} />
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  正在加载 {plugin.id} 的页面…
+                </Typography.Text>
+              </div>
+            ) : (
+              <Result
+                status={phaseCopy.tone === "error" ? "error" : "warning"}
+                title={phaseCopy.title}
+                subTitle={
+                  life.phase === "error" && life.errorMessage
+                    ? life.errorMessage
+                    : phaseCopy.description
+                }
+                extra={
+                  <Space>
+                    <Button type="primary" icon={<ReloadOutlined />} onClick={reload}>
+                      重新加载
+                    </Button>
+                    <Button icon={<FolderOpenOutlined />} onClick={() => void openDir()}>
+                      打开插件目录
+                    </Button>
+                  </Space>
+                }
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       <Modal
         open={pending !== null}
         title={pending?.title ?? ""}
         onCancel={() => answerPrompt("deny")}
-        maskClosable={false}
+        mask={{ closable: false }}
         footer={
           <Space>
             <Button danger onClick={() => answerPrompt("deny")}>

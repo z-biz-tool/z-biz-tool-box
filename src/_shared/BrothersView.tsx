@@ -168,6 +168,7 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
               size="small"
               type="text"
               icon={<ReloadOutlined />}
+              aria-label="重新检查更新"
               onClick={() => void load(true)}
               style={{ width: 28, height: 28, borderRadius: 8 }}
             />
@@ -178,6 +179,7 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
           size="small"
           type="text"
           icon={<ArrowLeftOutlined />}
+          aria-label="返回"
           onClick={onBack}
           style={{ width: 28, height: 28, borderRadius: 8 }}
           title="返回 (esc)"

@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Badge, message, Popconfirm, Tag, Typography } from "antd";
+import { Input, Badge, message, Popconfirm, Tag, Typography, Spin } from "antd";
 import {
   SearchOutlined,
   ArrowLeftOutlined,
-  PushpinOutlined,
   SettingOutlined,
   SyncOutlined,
   CloseOutlined,
   ReloadOutlined,
   AppstoreOutlined,
   ShopOutlined,
-  RocketOutlined,
   CheckCircleOutlined,
   WifiOutlined,
   DeleteOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import { TOOL_GROUPS } from "../plugins/_registry";
 import { useExtStore } from "../plugins/external/store";
@@ -39,10 +38,10 @@ interface MarketViewProps {
 
 /**
  * 插件应用市场视图 (仿 utools 截图):
- *  - 顶部: 搜索框(4767 款插件应用...) + 📌 钉 + ⚙
+ *  - 顶部: 搜索框(已装/可装真实计数) + 打开目录 + 市场源 + 刷新 + 关闭
  *  - 左侧: 已安装插件应用 (本地 builtin + 外部 ext)
  *  - 主区: 精选(1 大 + 4 小) + 排行榜 8 类
- *  - 底部: 立即登录 + 设置
+ *  - 底部: 已加载计数 + 市场源设置
  *
  * 数据策略:
  *  - "已安装" (左列) = builtin tools + ext plugins
@@ -64,6 +63,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
   };
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
+  const extError = useExtStore((s) => s.error);
   const extRefresh = useExtStore((s) => s.refresh);
   const marketSources = useUiStore((s) => s.marketSources);
   const allowInsecureSources = useUiStore((s) => s.allowInsecureSources);
@@ -157,6 +157,11 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
     return groups;
   }, [marketSources, installedExtMap]);
 
+  /** 市场上真正可装的条目数 —— 搜索框提示与计数都用它，不编造"4767 款" */
+  const remoteTotal = marketGroups.reduce((s, g) => s + g.plugins.length, 0);
+  /** 扫描失败的插件不再被悄悄过滤掉 */
+  const failedPlugins = extPlugins.filter((p) => p.error);
+
   // 装/更新远程插件
   // 台账 T1.7: 确认在**下载主文件之前** —— 先取 manifest(权限在里面), 用户确认后才下载。
   const handleInstall = async (
@@ -216,6 +221,15 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                   key={it.key}
                   data-no-drag
                   onClick={() => onSelectTool(it.key)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`打开 ${it.name}`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelectTool(it.key);
+                    }
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -274,6 +288,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
                       <button
                         data-no-drag
                         title="卸载"
+                        aria-label={`卸载 ${it.name}`}
                         onClick={(e) => e.stopPropagation()}
                         style={{
                           background: "transparent",
@@ -319,6 +334,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         <button
           onClick={onBack}
           data-no-drag
+          aria-label="返回主面板"
           style={{
             background: "transparent",
             border: 0,
@@ -341,7 +357,11 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             prefix={
               <SearchOutlined style={{ fontSize: 16, color: "#667eea" }} />
             }
-            placeholder={`搜索 ${installed.length + 4767} 款插件应用...`}
+            placeholder={
+              remoteTotal > 0
+                ? `搜索 ${installed.length} 个已装 / ${remoteTotal} 个可装插件…`
+                : `搜索 ${installed.length} 个已安装工具/插件…`
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             variant="borderless"
@@ -378,10 +398,15 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
       >
         <button
           className="mvIconBtn"
+          aria-label="打开插件目录"
           onClick={async () => {
             try {
               await openPluginsDir();
-            } catch {}
+            } catch (e) {
+              message.error(
+                `打开插件目录失败：${e instanceof Error ? e.message : String(e)}（只有桌面版可访问）`
+              );
+            }
           }}
           style={{
             background: "transparent",
@@ -408,6 +433,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         <button
           className="mvIconBtn"
           onClick={onOpenMarketSources}
+          aria-label="管理市场源"
           style={{
             background: marketSources.length === 0 ? "var(--ant-color-primary-bg)" : "transparent",
             border: 0,
@@ -436,6 +462,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           className="mvIconBtn"
           onClick={() => extRefresh()}
           disabled={extLoading}
+          aria-label="刷新外部插件列表"
           style={{
             background: "transparent",
             border: 0,
@@ -451,6 +478,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         <button
           className="mvIconBtn"
           onClick={onClose}
+          aria-label="隐藏窗口"
           style={{
             background: "transparent",
             border: 0,
@@ -459,22 +487,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             fontSize: 14,
             padding: 6,
           }}
-          title="关闭"
-        >
-          <PushpinOutlined />
-        </button>
-        <button
-          className="mvIconBtn"
-          onClick={onClose}
-          style={{
-            background: "transparent",
-            border: 0,
-            color: "var(--ant-color-text-tertiary)",
-            cursor: "pointer",
-            fontSize: 14,
-            padding: 6,
-          }}
-          title="关闭主窗口"
+          title="隐藏窗口"
         >
           <CloseOutlined />
         </button>
@@ -485,7 +498,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
         {/* 左侧: 已安装 */}
         <div
           style={{
-            width: 200,
+            width: 216,
             borderRight: "1px solid var(--ant-color-border-secondary)",
             boxShadow: "1px 0 4px rgba(0,0,0,0.03)",
             padding: "12px 10px",
@@ -506,18 +519,84 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
               marginBottom: 8,
             }}
           >
-            <span>已安装插件应用 ({installed.length})</span>
+            <span style={{ whiteSpace: "nowrap" }}>已安装 ({installed.length})</span>
             <span
               style={{
                 color: "var(--ant-color-text-tertiary)",
                 fontSize: 10,
                 fontWeight: 400,
+                whiteSpace: "nowrap",
               }}
             >
               {installed.filter((i) => !i.isExternal).length} 内置 ·{" "}
               {installed.filter((i) => i.isExternal).length} 外部
             </span>
           </div>
+          {/* 错误与加载态：扫描失败不能显示成"没有插件" */}
+          {extError && (
+            <div
+              style={{
+                margin: "0 2px 8px",
+                padding: "6px 8px",
+                borderRadius: 6,
+                background: "var(--ant-color-warning-bg)",
+                color: "var(--ant-color-warning-text)",
+                fontSize: 11,
+                lineHeight: 1.5,
+              }}
+              title={extError}
+            >
+              <WarningOutlined /> {extError}
+              <div>
+                <button
+                  onClick={() => void extRefresh()}
+                  style={{
+                    marginTop: 4,
+                    background: "transparent",
+                    border: "1px solid currentColor",
+                    borderRadius: 4,
+                    color: "inherit",
+                    fontSize: 11,
+                    padding: "1px 6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  重新扫描
+                </button>
+              </div>
+            </div>
+          )}
+          {failedPlugins.length > 0 && (
+            <div
+              style={{
+                margin: "0 2px 8px",
+                padding: "6px 8px",
+                borderRadius: 6,
+                background: "var(--ant-color-error-bg)",
+                color: "#cf1322",
+                fontSize: 11,
+                lineHeight: 1.5,
+              }}
+              title={failedPlugins.map((p) => `${p.name || p.id}: ${p.error}`).join("\n")}
+            >
+              <WarningOutlined /> {failedPlugins.length} 个插件加载失败
+              <div style={{ opacity: 0.8 }}>悬停查看原因，或打开插件目录修正后重新扫描</div>
+            </div>
+          )}
+          {extLoading && extPlugins.length === 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 10px",
+                fontSize: 11,
+                color: "var(--ant-color-text-tertiary)",
+              }}
+            >
+              <Spin size="small" /> 正在扫描插件目录…
+            </div>
+          )}
           {filteredInstalled.length === 0 ? (
             <div
               style={{
@@ -1533,7 +1612,7 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
       </div>
       </div>
 
-      {/* 底部: 立即登录 + 设置 */}
+      {/* 底部: 真实状态 + 设置入口（原来的「立即登录」没有任何后端，已移除） */}
       <div
         style={{
           padding: "10px 16px",
@@ -1549,40 +1628,6 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            padding: "3px 8px",
-            borderRadius: 6,
-            color: "var(--ant-color-text-tertiary)",
-            cursor: "pointer",
-            transition: "background 0.12s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background =
-              "var(--ant-color-fill-secondary)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-          }}
-        >
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-              background: "var(--ant-color-fill-tertiary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <RocketOutlined style={{ fontSize: 12 }} />
-          </div>
-          <span>立即登录</span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
             gap: 6,
             padding: "3px 12px",
             borderRadius: 10,
@@ -1590,15 +1635,24 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
             color: "var(--ant-color-success)",
             fontSize: 12,
           }}
+          title={`内置 ${installed.filter((i) => !i.isExternal).length} · 外部 ${installed.filter((i) => i.isExternal).length}`}
         >
           <CheckCircleOutlined style={{ fontSize: 12 }} />
-          <span>已加载 {installed.length} 个插件</span>
+          <span>已加载 {installed.length} 个工具/插件</span>
         </div>
-        <SettingOutlined
+        <button
+          onClick={onOpenMarketSources}
+          aria-label="市场源设置"
+          title="市场源设置"
           style={{
+            background: "transparent",
+            border: 0,
             cursor: "pointer",
+            color: "var(--ant-color-text-tertiary)",
             padding: 5,
             borderRadius: 6,
+            display: "inline-flex",
+            alignItems: "center",
             transition: "background 0.12s",
           }}
           onMouseEnter={(e) => {
@@ -1608,7 +1662,9 @@ export function MarketView({ onClose, onBack, onOpenMarketSources, onSelectTool 
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.background = "transparent";
           }}
-        />
+        >
+          <SettingOutlined />
+        </button>
       </div>
     </div>
     {installConfirmModal}

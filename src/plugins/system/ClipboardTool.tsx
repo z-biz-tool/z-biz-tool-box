@@ -9,6 +9,7 @@ import {
   Tag,
   message,
   Empty,
+  Popconfirm,
   Statistic,
   Row,
   Col,
@@ -122,8 +123,13 @@ export default function ClipboardTool() {
   };
 
   const clearAll = () => {
+    const removed = history.filter((item) => !item.pinned).length;
+    if (removed === 0) {
+      message.info("没有可清空的记录（置顶项不会被清空）");
+      return;
+    }
     setHistory(history.filter((item) => item.pinned));
-    message.success("已清空（保留置顶项）");
+    message.success(`已清空 ${removed} 条历史记录（保留 ${history.length - removed} 条置顶）`);
   };
 
   const filtered = filter
@@ -136,7 +142,7 @@ export default function ClipboardTool() {
   });
 
   return (
-    <Card title="剪贴板工具" bordered={false}>
+    <Card title="剪贴板工具" variant="borderless">
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
@@ -167,9 +173,19 @@ export default function ClipboardTool() {
           {autoWatch ? "停止监听" : "自动监听"}
         </Button>
         <Button onClick={readClipboard}>刷新当前</Button>
-        <Button onClick={clearAll} danger>
-          清空历史
-        </Button>
+        <Popconfirm
+          title="清空剪贴板历史？"
+          description={`将删除 ${history.filter((h) => !h.pinned).length} 条非置顶记录，不可恢复；置顶项会保留。`}
+          okText="清空"
+          cancelText="取消"
+          okType="danger"
+          disabled={history.filter((h) => !h.pinned).length === 0}
+          onConfirm={clearAll}
+        >
+          <Button danger disabled={history.filter((h) => !h.pinned).length === 0}>
+            清空历史
+          </Button>
+        </Popconfirm>
         <Tag color={autoWatch ? "green" : "default"}>{autoWatch ? "监听中..." : "未监听"}</Tag>
       </Space>
 

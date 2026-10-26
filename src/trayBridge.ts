@@ -27,7 +27,9 @@ export async function pushTrayTools(disabled?: string[]): Promise<void> {
   })).filter((g) => g.tools.length > 0);
   try {
     await invoke("register_tools", { groups });
-  } catch {
-    /* tray 推失败不该影响主界面 */
+  } catch (e) {
+    // best-effort：浏览器预览没有 Tauri；桌面版 register_tools 失败只影响托盘菜单，
+    // 主窗口必须照常可用。失败仍留一条 debug 线索，方便排查"菜单没更新"。
+    console.warn("[box] 推送托盘工具分组失败（非 Tauri 环境属预期）", e);
   }
 }

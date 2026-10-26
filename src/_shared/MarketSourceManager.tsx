@@ -190,6 +190,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
                     <Button
                       type="text"
                       icon={<ReloadOutlined spin={refreshing[s.id]} />}
+                      aria-label={`重新拉取 ${s.label ?? s.url}`}
                       loading={refreshing[s.id]}
                       onClick={() => handleRefresh(s)}
                     />
@@ -206,7 +207,12 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
                     description="不会影响本地已安装的插件,只删除配置"
                     onConfirm={() => removeMarketSource(s.id)}
                   >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      aria-label={`删除市场源 ${s.label ?? s.url}`}
+                    />
                   </Popconfirm>,
                 ]}
               >
@@ -247,6 +253,7 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
                             type="text"
                             size="small"
                             icon={<EditOutlined />}
+                            aria-label={`重命名市场源 ${s.label ?? s.url}`}
                             onClick={() => {
                               setEditingId(s.id);
                               setEditingLabel(s.label ?? "");

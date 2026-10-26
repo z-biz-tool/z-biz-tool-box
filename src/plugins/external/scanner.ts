@@ -10,6 +10,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import type { ExternalPlugin, ExternalPluginManifest } from "./types";
 import { getPluginsDir } from "./paths";
 import { checkApiCompatibility, parsePluginApiVersion } from "./api-version.ts";
+import { isDirectoryMissingError } from "./fs-errors.ts";
 
 let cachedDir: string | null = null;
 async function pluginsDir(): Promise<string> {
@@ -27,9 +28,10 @@ export async function scanExternalPlugins(): Promise<ExternalPlugin[]> {
   let entries: Awaited<ReturnType<typeof readDir>> = [];
   try {
     entries = await readDir(dir);
-  } catch {
-    // 目录不存在 → 空列表
-    return [];
+  } catch (e) {
+    // 目录不存在 → 空列表；权限/IO 错误必须抛给 store，显示成错误而不是空态
+    if (isDirectoryMissingError(e)) return [];
+    throw e;
   }
 
   const results: ExternalPlugin[] = [];

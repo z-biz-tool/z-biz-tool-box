@@ -357,6 +357,7 @@ function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
         size="small"
         type="text"
         icon={<ArrowLeftOutlined />}
+        aria-label="返回"
         onClick={onBack}
         style={{ width: 28, height: 28, borderRadius: 8 }}
         title="返回 (esc)"

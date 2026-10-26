@@ -51,10 +51,12 @@ export function formatError(value: unknown): string {
 export function writeFrontendLog(level: string, message: string): void {
   try {
     // 不 await: 错误处理路径不该 await 任何可能失败的东西。
-    // 失败时 invoke 会 reject, 这里吞掉。
-    void invoke("write_log", { level, message }).catch(() => {});
-  } catch {
-    /* 吞掉 */
+    // 落盘失败只能退回控制台 —— 再走一遍桥会递归。
+    void invoke("write_log", { level, message }).catch((e) => {
+      console.warn("[box] 前端日志落盘失败（best-effort，仅控制台可见）", e);
+    });
+  } catch (e) {
+    console.warn("[box] 前端日志落盘失败（best-effort，仅控制台可见）", e);
   }
 }
 

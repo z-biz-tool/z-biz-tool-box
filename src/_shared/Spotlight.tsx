@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "antd";
+import { Input, message } from "antd";
 import {
   SearchOutlined,
   AppstoreOutlined,
@@ -13,9 +13,11 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   GlobalOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import { ALL_TOOLS, TOOL_GROUPS } from "../plugins/_registry";
 import type { ToolMeta } from "../plugins/_types";
+import { rankDocs } from "../plugins/searchScore";
 import { useUiStore } from "../stores/uiStore";
 import { useExtStore } from "../plugins/external/store";
 import { openPluginsDir } from "../plugins/external/scanner";
@@ -58,6 +60,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
   const sourcesCount = useUiStore((s) => s.marketSources.length);
   const extPlugins = useExtStore((s) => s.plugins);
   const extLoading = useExtStore((s) => s.loading);
+  const extError = useExtStore((s) => s.error);
   const extRefresh = useExtStore((s) => s.refresh);
 
   useEffect(() => {
@@ -135,10 +138,13 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     }
 
     if (q) {
-      pool = pool.filter((t) => {
-        const hay = `${t.label} ${t.description} ${t.keywords ?? ""} ${(t.cmds ?? []).join(" ")} ${t.key}`.toLowerCase();
-        return q.split(/\s+/).every((w) => hay.includes(w));
-      });
+      // 台账 T3.5：统一打分（精确/前缀/首字母/子串），同档内按最近使用与收藏排序。
+      pool = rankDocs(q, pool, { recent, starred });
+    }
+
+    // 收藏/最近的中列是二级筛选：点某一项要真的收窄右列，否则就是死按钮。
+    if ((activeNav === "starred" || activeNav === "recent") && activeCategory !== "all") {
+      pool = pool.filter((t) => t.key === activeCategory);
     }
 
     return pool;
@@ -153,32 +159,39 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // 输入法组字期间的 Enter/方向键属于输入法，不是"打开工具"
+      if (e.isComposing) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         const idx = items.findIndex((t) => t.key === activeKey);
         const next = items[Math.min(items.length - 1, idx + 1)];
         if (next) setActiveKey(next.key);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         const idx = items.findIndex((t) => t.key === activeKey);
         const prev = items[Math.max(0, idx - 1)];
         if (prev) setActiveKey(prev.key);
       } else if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         const cur = items.find((t) => t.key === activeKey);
         if (cur) onSelect(cur.key);
       } else if (e.key === "Escape") {
-        e.preventDefault();
+        // App 也在 window 上监听 Esc 并隐藏窗口。这里用捕获阶段先拿到：
+        // 有查询词时先清查询（并阻止 App 隐藏），没有查询词时交回 App。
         if (query) {
+          e.preventDefault();
+          e.stopPropagation();
           setQuery("");
-        } else {
-          onClose();
         }
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [items, activeKey, onSelect, onClose, query]);
+    // 捕获阶段：必须比 App.tsx 的 Esc 处理器更早，否则一下 Esc 既清空又隐藏窗口
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [items, activeKey, onSelect, query]);
 
   useEffect(() => {
     if (!activeKey) return;
@@ -373,8 +386,33 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
 
           {activeNav === "external" && (
             <NavSection title="外部插件">
-              {extPlugins.length === 0 ? (
-                <EmptyHint text="还没有外部插件" sub="点击右下「打开插件目录」" />
+              {extError ? (
+                <div style={{ padding: "4px 10px 8px", fontSize: 11, lineHeight: 1.5 }}>
+                  <div style={{ color: "var(--ant-color-warning)", display: "flex", gap: 4 }}>
+                    <WarningOutlined style={{ marginTop: 3 }} />
+                    <span>{extError}</span>
+                  </div>
+                  <button
+                    className="zBizToolbarBtn"
+                    onClick={() => void extRefresh()}
+                    style={{
+                      marginTop: 6,
+                      background: "transparent",
+                      border: "1px solid var(--ant-color-border)",
+                      borderRadius: 6,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      color: "var(--ant-color-text-secondary)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    重新扫描
+                  </button>
+                </div>
+              ) : extLoading && extPlugins.length === 0 ? (
+                <EmptyHint text="正在扫描插件目录…" />
+              ) : extPlugins.length === 0 ? (
+                <EmptyHint text="还没有外部插件" sub="点击右下「打开目录」" />
               ) : (
                 extPlugins.map((p) => (
                   <NavItem
@@ -399,7 +437,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           {activeNav === "starred" && (
             <NavSection title="收藏的工具">
               {starred.length === 0 ? (
-                <EmptyHint text="还没有收藏" />
+                <EmptyHint text="还没有收藏" sub="工具右上角星标后会出现在这里" />
               ) : (
                 starred.map((k) => {
                   const t = allTools.find((x) => x.key === k);
@@ -410,7 +448,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
                       icon={t.icon}
                       label={t.label}
                       active={activeCategory === k}
-                      onClick={() => setActiveCategory(k)}
+                      onClick={() =>
+                        setActiveCategory((prev) => (prev === k ? "all" : k))
+                      }
                     />
                   );
                 })
@@ -421,7 +461,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           {activeNav === "recent" && (
             <NavSection title="最近使用">
               {recent.length === 0 ? (
-                <EmptyHint text="还没有记录" />
+                <EmptyHint text="还没有记录" sub="打开一个工具后会自动记录" />
               ) : (
                 recent.map((k) => {
                   const t = allTools.find((x) => x.key === k);
@@ -432,7 +472,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
                       icon={t.icon}
                       label={t.label}
                       active={activeCategory === k}
-                      onClick={() => setActiveCategory(k)}
+                      onClick={() =>
+                        setActiveCategory((prev) => (prev === k ? "all" : k))
+                      }
                     />
                   );
                 })
@@ -520,9 +562,31 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
               >
                 <SearchOutlined style={{ fontSize: 24, opacity: 0.4 }} />
               </div>
-              <span>没有匹配的功能</span>
+              <span>
+                {query
+                  ? "没有匹配的功能"
+                  : activeNav === "external"
+                  ? extError
+                    ? "外部插件列表不可用"
+                    : "还没有外部插件"
+                  : activeNav === "starred"
+                  ? "还没有收藏"
+                  : activeNav === "recent"
+                  ? "还没有使用记录"
+                  : "没有可显示的工具"}
+              </span>
               <span style={{ fontSize: 11, opacity: 0.7 }}>
-                试试: base64 / uuid / json / http / 时间戳
+                {query
+                  ? "试试: base64 / uuid / json / http / 时间戳"
+                  : activeNav === "external"
+                  ? extError
+                    ? "浏览器预览没有桌面能力；桌面版请检查插件目录与权限声明"
+                    : "把插件放进插件目录后会自动出现"
+                  : activeNav === "starred"
+                  ? "在工具右上角点星标即可收藏"
+                  : activeNav === "recent"
+                  ? "打开任意工具后会出现在这里"
+                  : "工具被禁用时不会出现在这里，可在偏好设置里重新启用"}
               </span>
             </div>
           ) : (
@@ -568,7 +632,12 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             onClick={async () => {
               try {
                 await openPluginsDir();
-              } catch {}
+              } catch (e) {
+                // 契约：不可用要说明原因，不能点了没反应
+                message.error(
+                  `打开插件目录失败：${e instanceof Error ? e.message : String(e)}（外部插件目录只有桌面版可访问）`
+                );
+              }
             }}
           >
             📁 打开目录
@@ -621,6 +690,16 @@ function NavItem({
   return (
     <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-pressed={!!active}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }
+      }}
       className="zBizNavItem"
       style={{
         display: "flex",
@@ -704,8 +783,9 @@ function NavItem({
 }
 
 function TabButton({ children, active }: { children: React.ReactNode; active?: boolean }) {
+  // 只是统计标签，不是可切换的页签：不要给它 cursor:pointer 假装能点。
   return (
-    <div
+    <span
       style={{
         padding: "4px 10px",
         borderRadius: 6,
@@ -715,12 +795,11 @@ function TabButton({ children, active }: { children: React.ReactNode; active?: b
           : "transparent",
         color: active ? "var(--ant-color-primary)" : "var(--ant-color-text-tertiary)",
         fontWeight: active ? 600 : 400,
-        cursor: "pointer",
-        transition: `all ${motion.fast}`,
+        userSelect: "none",
       }}
     >
       {children}
-    </div>
+    </span>
   );
 }
 
@@ -740,6 +819,16 @@ function FeatureRow({
       data-sp-idx={tool.key}
       onClick={onClick}
       onMouseEnter={onHover}
+      role="button"
+      tabIndex={0}
+      aria-label={`${tool.label}：${tool.description}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }
+      }}
       style={{
         display: "flex",
         alignItems: "center",

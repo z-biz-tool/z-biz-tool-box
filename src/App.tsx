@@ -5,12 +5,16 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
-import { getTool, getGroupOfTool } from "./tools";
+import { getTool, getGroupOfTool, ALL_TOOLS } from "./tools";
 import { pushTrayTools } from "./trayBridge";
+import { resolveBrotherKey, resolveTrayToolKey } from "./trayEvents";
 import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 import { radius, shadow, size, motion } from "./_shared/designTokens";
+
+/** tray 只推内置工具 ⇒ 可路由的 key 集合在模块加载时就固定 */
+const TOOL_KEYS = ALL_TOOLS.map((t) => t.key);
 
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
@@ -59,12 +63,21 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<string>("select-tool", (e) => {
-      const key = e.payload;
-      if (!key) return;
+      // 托盘菜单可能残留已删除/改名的工具 ⇒ 不把非法 key 交给路由
+      const key = resolveTrayToolKey(e.payload, TOOL_KEYS);
+      if (!key) {
+        console.warn("[box] 忽略无法识别的托盘工具 key", e.payload);
+        return;
+      }
       setActiveKey(key);
-    }).then((u) => {
-      unlisten = u;
-    });
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((e) => {
+        // 纯浏览器预览没有 Tauri 事件系统；桌面版失败也只影响托盘联动
+        console.warn("[box] 订阅 select-tool 失败（非 Tauri 环境属预期）", e);
+      });
     return () => {
       unlisten?.();
     };
@@ -74,10 +87,19 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<string>("open-brothers", (e) => {
-      setActiveKey(`brothers::${e.payload}`);
-    }).then((u) => {
-      unlisten = u;
-    });
+      const key = resolveBrotherKey(e.payload);
+      if (!key) {
+        console.warn("[box] 忽略无法识别的兄弟应用 key", e.payload);
+        return;
+      }
+      setActiveKey(`brothers::${key}`);
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((e) => {
+        console.warn("[box] 订阅 open-brothers 失败（非 Tauri 环境属预期）", e);
+      });
     return () => {
       unlisten?.();
     };
@@ -97,7 +119,8 @@ export default function App() {
         } else if (activeKey === "spotlight") {
           getCurrentWindow()
             .hide()
-            .catch(() => {});
+            // best-effort：隐藏是脚本的副作用，失败（浏览器预览）不该拦住 Esc 的其他行为
+            .catch((err) => console.debug("[box] Esc 隐藏窗口失败", err));
           e.preventDefault();
         } else {
           setActiveKey("spotlight");
@@ -114,7 +137,7 @@ export default function App() {
         e.preventDefault();
         getCurrentWindow()
           .hide()
-          .catch(() => {});
+          .catch((err) => console.debug("[box] ⌥Space 隐藏窗口失败", err));
       }
     };
     window.addEventListener("keydown", handler);
@@ -131,12 +154,18 @@ export default function App() {
   const hideWindow = async () => {
     try {
       await getCurrentWindow().hide();
-    } catch {}
+    } catch (e) {
+      // best-effort：浏览器预览没有窗口 API；桌面版隐藏失败也不该中断界面
+      console.warn("[box] 隐藏窗口失败", e);
+    }
   };
   const minimizeWindow = async () => {
     try {
       await getCurrentWindow().minimize();
-    } catch {}
+    } catch (e) {
+      // 同上
+      console.warn("[box] 最小化窗口失败", e);
+    }
   };
 
   return (
@@ -341,6 +370,7 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
               <Button
                 size="small"
                 type="text"
+                aria-label="最小化窗口"
                 icon={<MinusOutlined />}
                 onClick={onMinimize}
                 style={{ width: 28, height: 28, borderRadius: 8 }}
@@ -350,6 +380,7 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
               <Button
                 size="small"
                 type="text"
+                aria-label="隐藏窗口"
                 icon={<CloseOutlined />}
                 onClick={onClose}
                 style={{ width: 28, height: 28, borderRadius: 8 }}
@@ -362,6 +393,7 @@ function ToolView({ title, group, isExternal, onBack, onMinimize, onClose, child
           <Button
             size="small"
             type="text"
+            aria-label="返回主面板"
             icon={<ArrowLeftOutlined />}
             onClick={onBack}
             style={{
