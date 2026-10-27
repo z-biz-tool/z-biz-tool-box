@@ -10,25 +10,30 @@ import { useUiStore } from "../stores/uiStore";
  *   <Button onClick={() => copy(output)}>复制结果</Button>
  */
 export function useCopyToClipboard() {
-  return useCallback(async (text: string, label = "已复制") => {
-    if (!text) return;
+  return useCallback(async (text: string, label = "已复制"): Promise<boolean> => {
+    if (!text) return false;
     try {
       await navigator.clipboard.writeText(text);
       message.success(label);
+      return true;
     } catch {
       // 退化方案: 用隐藏 textarea + execCommand
+      const ta = document.createElement("textarea");
       try {
-        const ta = document.createElement("textarea");
         ta.value = text;
         ta.style.position = "fixed";
         ta.style.opacity = "0";
         document.body.appendChild(ta);
         ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
+        // execCommand 失败时返回 false 而不是抛错，必须看返回值
+        if (!document.execCommand("copy")) throw new Error("execCommand copy 返回 false");
         message.success(label);
+        return true;
       } catch {
         message.error("复制失败,请手动复制");
+        return false;
+      } finally {
+        ta.remove();
       }
     }
   }, []);

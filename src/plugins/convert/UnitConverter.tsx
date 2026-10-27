@@ -1,7 +1,7 @@
 
-import { Card, Select, InputNumber, Row, Col, Statistic, Space, message } from "antd";
+import { Card, Select, InputNumber, Row, Col, Statistic, Space } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "unit",
@@ -130,6 +130,7 @@ function convert(value: number, from: string, to: string, category: Category): n
 }
 
 export default function UnitConverter() {
+  const copyText = useCopyToClipboard();
   const [category, setCategory] = useToolState<Category>("unit", "category", "length");
   const [value, setValue] = useToolState("unit", "value", 1);
   const [fromUnit, setFromUnit] = useToolState("unit", "fromUnit", "m");
@@ -149,8 +150,7 @@ export default function UnitConverter() {
       : Number(result.toPrecision(10)).toString();
 
   const copyResult = () => {
-    navigator.clipboard.writeText(resultStr);
-    message.success("已复制");
+    void copyText(resultStr);
   };
 
   return (

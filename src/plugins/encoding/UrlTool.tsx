@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col } from "antd";
-import { usePluginInput } from "../../_shared";
+import { useCommonStyles, useCopyToClipboard, usePluginInput } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -13,6 +13,8 @@ export const meta: PluginMeta = {
 
 
 export default function UrlTool() {
+  const common = useCommonStyles();
+  const copyText = useCopyToClipboard();
   const [input, setInput] = usePluginInput("url");
   const [output, setOutput] = useState("");
 
@@ -52,8 +54,7 @@ export default function UrlTool() {
   };
 
   const copyOut = () => {
-    navigator.clipboard.writeText(output);
-    message.success("已复制到剪贴板");
+    void copyText(output, "已复制到剪贴板");
   };
 
   return (
@@ -74,7 +75,7 @@ export default function UrlTool() {
             rows={8}
             value={output}
             readOnly
-            style={{ fontFamily: "monospace", background: "#fafafa" }}
+            style={common.output}
           />
         </Col>
       </Row>

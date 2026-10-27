@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Input, Button, Space, Card, message } from "antd";
-import { usePluginInput } from "../../_shared";
+import { Input, Button, Space, Card } from "antd";
+import { useCommonStyles, useCopyToClipboard, usePluginInput } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -13,6 +13,8 @@ export const meta: PluginMeta = {
 
 
 export default function CaseTool() {
+  const common = useCommonStyles();
+  const copyText = useCopyToClipboard();
   const [input, setInput] = usePluginInput("case");
   const [output, setOutput] = useState("");
 
@@ -70,8 +72,7 @@ export default function CaseTool() {
   };
 
   const copyOut = () => {
-    navigator.clipboard.writeText(output);
-    message.success("已复制");
+    void copyText(output);
   };
 
   return (
@@ -109,7 +110,7 @@ export default function CaseTool() {
         rows={5}
         value={output}
         readOnly
-        style={{ fontFamily: "monospace", background: "#fafafa" }}
+        style={common.output}
       />
     </Card>
   );

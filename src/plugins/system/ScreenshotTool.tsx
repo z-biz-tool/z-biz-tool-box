@@ -11,6 +11,7 @@ import {
   Select,
   Tooltip,
   Switch,
+  theme,
 } from "antd";
 import {
   CameraOutlined,
@@ -43,6 +44,7 @@ interface ScreenshotRecord {
 }
 
 export default function ScreenshotTool() {
+  const { token } = theme.useToken();
   const [mode, setMode] = useState<ScreenshotMode>("fullscreen");
   const [delay, setDelay] = useState(0);
   const [captureCursor, setCaptureCursor] = useState(true);
@@ -295,7 +297,7 @@ export default function ScreenshotTool() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: "#f5f5f5",
+                      background: token.colorFillTertiary,
                     }}
                   >
                     <img

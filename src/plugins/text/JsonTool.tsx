@@ -30,7 +30,7 @@ import {
   ClearOutlined,
   LinkOutlined,
 } from "@ant-design/icons";
-import { MONO_FONT, useToolState } from "../../_shared";
+import { useCopyToClipboard, MONO_FONT, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 
 export const meta: PluginMeta = {
@@ -377,6 +377,7 @@ function TreeTab({
 }
 
 function JsonTree({ value, name, defaultExpanded = false, depth = 0 }: { value: unknown; name?: string; defaultExpanded?: boolean; depth?: number }) {
+  const copyText = useCopyToClipboard();
   const [expanded, setExpanded] = useState(defaultExpanded || depth < 2);
   const [copied, setCopied] = useState(false);
 
@@ -388,9 +389,11 @@ function JsonTree({ value, name, defaultExpanded = false, depth = 0 }: { value: 
   const copyValue = (e: React.MouseEvent) => {
     e.stopPropagation();
     const text = isObject ? JSON.stringify(value, null, 2) : String(value);
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1000);
+    void copyText(text).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1000);
+    });
   };
 
   const renderKey = () => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Card, Input, Button, Space, Tag, Alert, Row, Col } from "antd";
+import { Card, Input, Button, Space, Tag, Alert, Row, Col, theme } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 // 解析/描述/下次运行时间的纯逻辑在 cronLogic.ts：
 // 组件只负责渲染，计算与校验全在纯逻辑模块里（可被 node --test 直接测）。
@@ -36,6 +36,8 @@ const EXAMPLES = [
 ];
 
 export default function CronParser() {
+  const { token } = theme.useToken();
+  const copyText = useCopyToClipboard();
   const [expr, setExpr] = useToolState("cron", "expr", "0 9 * * 1-5");
   const [result, setResult] = useState(() => getCronDescription("0 9 * * 1-5"));
 
@@ -62,12 +64,12 @@ export default function CronParser() {
           placeholder="*/5 * * * *"
           style={{ width: 300, fontFamily: "monospace", fontSize: 16 }}
         />
-        <Button onClick={() => navigator.clipboard.writeText(expr)}>复制表达式</Button>
+        <Button onClick={() => void copyText(expr)}>复制表达式</Button>
       </Space>
       {result.error && <Alert type="error" message={result.error} style={{ marginBottom: 12 }} />}
       {result.description && (
         <>
-          <Card size="small" type="inner" style={{ marginBottom: 12, background: "#f6ffed" }}>
+          <Card size="small" type="inner" style={{ marginBottom: 12, background: token.colorSuccessBg }}>
             <Space>
               <Tag color="green">中文描述</Tag>
               <span style={{ fontSize: 16, fontWeight: 500 }}>{result.description}</span>

@@ -73,14 +73,22 @@ export default function ClipboardTool() {
   }, [lastClip, autoWatch]);
 
   const writeClipboard = async (text: string) => {
+    let ok = false;
     try {
       await writeText(text);
+      ok = true;
     } catch {
+      // Tauri 插件不可用（浏览器演示区）时退回浏览器 API
       try {
         await navigator.clipboard.writeText(text);
+        ok = true;
       } catch {
-        /* ignore */
+        // 两条路都失败，下面统一报错
       }
+    }
+    if (!ok) {
+      message.error("写入剪贴板失败");
+      return;
     }
     setLastClip(text);
     setCurrent(text);

@@ -15,7 +15,7 @@ import {
   message,
 } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "pwdgen",
@@ -38,6 +38,7 @@ interface CharSets {
 }
 
 export default function PasswordGen() {
+  const copyText = useCopyToClipboard();
   const [length, setLength] = useToolState("pwdgen", "length", 16);
   const [charSets, setCharSets] = useToolState<CharSets>("pwdgen", "charSets", {
     lower: true,
@@ -87,8 +88,7 @@ export default function PasswordGen() {
   };
 
   const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    message.success("已复制");
+    void copyText(text);
   };
 
   const strengthColor = strength < 40 ? "#ff4d4f" : strength < 70 ? "#faad14" : "#52c41a";

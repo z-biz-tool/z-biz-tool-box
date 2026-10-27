@@ -12,7 +12,7 @@ import {
   Typography,
 } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "uuid",
@@ -24,6 +24,7 @@ export const meta: PluginMeta = {
 
 
 export default function UuidTool() {
+  const copyText = useCopyToClipboard();
   const [uuid, setUuid] = useState("");
   const [count, setCount] = useToolState("uuid", "count", 1);
   const [version, setVersion] = useToolState<"v4" | "nil">("uuid", "version", "v4");
@@ -70,8 +71,7 @@ export default function UuidTool() {
   };
 
   const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    message.success("已复制");
+    void copyText(text);
   };
 
   return (

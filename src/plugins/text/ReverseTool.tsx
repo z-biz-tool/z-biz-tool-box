@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio, Row, Col } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCommonStyles, useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "reverse",
@@ -15,6 +15,8 @@ export const meta: PluginMeta = {
 type Mode = "chars" | "words" | "lines" | "charsAll";
 
 export default function ReverseTool() {
+  const common = useCommonStyles();
+  const copyText = useCopyToClipboard();
   const [input, setInput] = useToolState("reverse", "input", "");
   const [output, setOutput] = useState("");
   const [mode, setMode] = useToolState<Mode>("reverse", "mode", "chars");
@@ -67,7 +69,7 @@ export default function ReverseTool() {
             rows={8}
             value={output}
             readOnly
-            style={{ fontFamily: "monospace", background: "#fafafa" }}
+            style={common.output}
           />
         </Col>
       </Row>
@@ -85,8 +87,7 @@ export default function ReverseTool() {
         </Button>
         <Button
           onClick={() => {
-            navigator.clipboard.writeText(output);
-            message.success("已复制");
+            void copyText(output);
           }}
           disabled={!output}
         >

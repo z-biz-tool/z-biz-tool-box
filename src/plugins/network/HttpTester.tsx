@@ -13,10 +13,11 @@ import {
   Alert,
   message,
   Divider,
+  theme,
 } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 
-import { useToolState } from "../../_shared";
+import { useCommonStyles, useToolState } from "../../_shared";
 import { useUiStore } from "../../stores/uiStore";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -46,6 +47,8 @@ interface Response {
 }
 
 export default function HttpTester() {
+  const common = useCommonStyles();
+  const { token } = theme.useToken();
   const [method, setMethod] = useToolState("http", "method", "GET");
   const [url, setUrl] = useToolState("http", "url", "https://httpbin.org/get");
   const [headers, setHeaders] = useToolState<Header[]>("http", "headers", [
@@ -231,7 +234,7 @@ export default function HttpTester() {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card size="small">
-                <div style={{ fontSize: 12, color: "#999" }}>状态码</div>
+                <div style={{ fontSize: 12, color: token.colorTextTertiary }}>状态码</div>
                 <Tag color={statusColor} style={{ fontSize: 18, marginTop: 4 }}>
                   {response.status} {response.statusText}
                 </Tag>
@@ -269,7 +272,7 @@ export default function HttpTester() {
               rows={10}
               value={formattedBody}
               readOnly
-              style={{ fontFamily: "monospace", background: "#fafafa" }}
+              style={common.output}
             />
           </Card>
         </>

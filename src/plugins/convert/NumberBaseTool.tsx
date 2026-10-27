@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Card, Input, Row, Col, Tag, Space, Radio, message } from "antd";
+import { Button, Card, Input, Row, Col, Tag, Space, Radio } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "numberbase",
@@ -22,6 +22,7 @@ const BASE_INFO: Record<Base, { radix: number; label: string; color: string }> =
 };
 
 export default function NumberBaseTool() {
+  const copyText = useCopyToClipboard();
   const [values, setValues] = useToolState<Record<Base, string>>("numberbase", "values", {
     bin: "",
     oct: "",
@@ -69,8 +70,7 @@ export default function NumberBaseTool() {
   };
 
   const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    message.success("已复制");
+    void copyText(text);
   };
 
   const presets = [255, 1024, 65535, 2147483647];
@@ -101,19 +101,9 @@ export default function NumberBaseTool() {
                   placeholder={`输入${BASE_INFO[base].label}数值`}
                   style={{ fontFamily: "monospace", fontSize: 16 }}
                 />
-                <button
-                  type="button"
-                  onClick={() => values[base] && copy(values[base])}
-                  style={{
-                    padding: "0 16px",
-                    border: "1px solid #d9d9d9",
-                    borderLeft: "none",
-                    cursor: "pointer",
-                    background: "#fafafa",
-                  }}
-                >
+                <Button onClick={() => values[base] && copy(values[base])} disabled={!values[base]}>
                   复制
-                </button>
+                </Button>
               </Space.Compact>
             </Card>
           </Col>

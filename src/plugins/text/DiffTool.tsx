@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Input, Button, Space, Card, Row, Col } from "antd";
+import { Input, Button, Space, Card, Row, Col, theme } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCommonStyles, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "diff",
@@ -13,6 +13,8 @@ export const meta: PluginMeta = {
 
 
 export default function DiffTool() {
+  const common = useCommonStyles();
+  const { token } = theme.useToken();
   const [left, setLeft] = useToolState("diff", "left", "");
   const [right, setRight] = useToolState("diff", "right", "");
   const [diff, setDiff] = useState<{ type: "add" | "del" | "eq"; text: string }[]>([]);
@@ -95,27 +97,36 @@ export default function DiffTool() {
         <div style={{ marginBottom: 8, fontWeight: 500 }}>差异结果</div>
         <div
           style={{
-            background: "#fafafa",
+            background: common.output.background,
             padding: 12,
             borderRadius: 6,
-            fontFamily: "monospace",
+            fontFamily: "var(--mono-font)",
             minHeight: 100,
           }}
         >
-          {diff.length === 0 && <span style={{ color: "#999" }}>点击"计算差异"查看结果</span>}
+          {diff.length === 0 && <span style={{ color: token.colorTextTertiary }}>点击"计算差异"查看结果</span>}
           {diff.map((line, idx) => (
             <div
               key={idx}
               style={{
                 padding: "2px 8px",
                 background:
-                  line.type === "add" ? "#f6ffed" : line.type === "del" ? "#fff1f0" : "transparent",
-                color: line.type === "add" ? "#52c41a" : line.type === "del" ? "#ff4d4f" : "#333",
+                  line.type === "add"
+                    ? token.colorSuccessBg
+                    : line.type === "del"
+                      ? token.colorErrorBg
+                      : "transparent",
+                color:
+                  line.type === "add"
+                    ? token.colorSuccessText
+                    : line.type === "del"
+                      ? token.colorErrorText
+                      : token.colorText,
                 borderLeft:
                   line.type === "add"
-                    ? "3px solid #52c41a"
+                    ? `3px solid ${token.colorSuccessBorder}`
                     : line.type === "del"
-                      ? "3px solid #ff4d4f"
+                      ? `3px solid ${token.colorErrorBorder}`
                       : "3px solid transparent",
               }}
             >

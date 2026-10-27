@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Radio } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCommonStyles, useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "sort",
@@ -15,6 +15,8 @@ export const meta: PluginMeta = {
 type Mode = "asc" | "desc" | "shuffle" | "reverse" | "natural";
 
 export default function SortTool() {
+  const common = useCommonStyles();
+  const copyText = useCopyToClipboard();
   const [input, setInput] = useToolState("sort", "input", "");
   const [output, setOutput] = useState("");
   const [mode, setMode] = useToolState<Mode>("sort", "mode", "asc");
@@ -101,8 +103,7 @@ export default function SortTool() {
         </Button>
         <Button
           onClick={() => {
-            navigator.clipboard.writeText(output);
-            message.success("已复制");
+            void copyText(output);
           }}
           disabled={!output}
         >
@@ -113,7 +114,7 @@ export default function SortTool() {
         rows={6}
         value={output}
         readOnly
-        style={{ fontFamily: "monospace", background: "#fafafa" }}
+        style={common.output}
       />
     </Card>
   );

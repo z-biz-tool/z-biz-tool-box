@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Select, Tag, Row, Col, Statistic } from "antd";
 
-import { useToolState } from "../../_shared";
+import { useCopyToClipboard, useToolState } from "../../_shared";
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
   key: "hash",
@@ -21,6 +21,7 @@ const ALGORITHMS = [
 ];
 
 export default function HashTool() {
+  const copyText = useCopyToClipboard();
   const [input, setInput] = useToolState("hash", "input", "");
   const [algo, setAlgo] = useToolState("hash", "algo", "sha-256");
   const [results, setResults] = useState<Record<string, string>>({});
@@ -70,8 +71,7 @@ export default function HashTool() {
   };
 
   const copy = (val: string) => {
-    navigator.clipboard.writeText(val);
-    message.success("已复制");
+    void copyText(val);
   };
 
   return (

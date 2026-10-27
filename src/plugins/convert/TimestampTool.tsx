@@ -12,6 +12,7 @@ import {
   DatePicker,
   Radio,
   Tag,
+  theme,
 } from "antd";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -54,6 +55,7 @@ const TIMEZONES = [
 ];
 
 export default function TimestampTool() {
+  const { token } = theme.useToken();
   const [mode, setMode] = useToolState<Mode>("timestamp", "mode", "ts2date");
   const [unit, setUnit] = useToolState<Unit>("timestamp", "unit", "s");
   const [timezone, setTimezone] = useToolState("timestamp", "timezone", "Asia/Shanghai");
@@ -142,7 +144,7 @@ export default function TimestampTool() {
         </Col>
         <Col span={6}>
           <Card size="small">
-            <div style={{ fontSize: 12, color: "#999" }}>当前时间 ({timezone})</div>
+            <div style={{ fontSize: 12, color: token.colorTextTertiary }}>当前时间 ({timezone})</div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>{formatInTz(dayjs())}</div>
           </Card>
         </Col>

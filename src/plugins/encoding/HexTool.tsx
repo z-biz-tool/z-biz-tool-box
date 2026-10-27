@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input, Button, Space, Card, message, Row, Col, Radio } from "antd";
-import { usePluginInput, useToolState } from "../../_shared";
+import { useCommonStyles, useCopyToClipboard, usePluginInput, useToolState } from "../../_shared";
 
 import type { PluginMeta } from "../_types";
 export const meta: PluginMeta = {
@@ -15,6 +15,8 @@ export const meta: PluginMeta = {
 type Mode = "string" | "bytes";
 
 export default function HexTool() {
+  const common = useCommonStyles();
+  const copyText = useCopyToClipboard();
   const [input, setInput] = usePluginInput("hex");
   const [output, setOutput] = useState("");
   const [mode, setMode] = useToolState<Mode>("hex", "mode", "string");
@@ -60,8 +62,7 @@ export default function HexTool() {
   };
 
   const copyOut = () => {
-    navigator.clipboard.writeText(output);
-    message.success("已复制到剪贴板");
+    void copyText(output, "已复制到剪贴板");
   };
 
   return (
@@ -90,7 +91,7 @@ export default function HexTool() {
             rows={8}
             value={output}
             readOnly
-            style={{ fontFamily: "monospace", background: "#fafafa" }}
+            style={common.output}
           />
         </Col>
       </Row>
