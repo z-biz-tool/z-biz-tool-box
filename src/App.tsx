@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Tag, Typography, Button, Tooltip } from "antd";
+import { Tag, Typography, Button, Tooltip, message } from "antd";
 import { ArrowLeftOutlined, MinusOutlined, CloseOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { startDeepLinkReceiver, ZBIZ_TAKE_PENDING } from "z-biz-tool-shared/protocol";
 import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool, ALL_TOOLS } from "./tools";
@@ -13,16 +14,10 @@ import { useUiStore } from "./stores/uiStore";
 import { useExtStore, initExtStore } from "./plugins/external/store";
 import { PluginIframe } from "./plugins/external/PluginIframe";
 import { radius, shadow, size, motion } from "./_shared/designTokens";
+import { resolveBoxDeepLink, type HandoffItem } from "./_shared/deepLink";
 
 /** tray 只推内置工具 ⇒ 可路由的 key 集合在模块加载时就固定 */
 const TOOL_KEYS = ALL_TOOLS.map((t) => t.key);
-
-/** Rust 侧 `cap_hub::Handoff` 的镜像（serde 默认字段名，不做 camelCase） */
-interface HandoffItem {
-  product: string;
-  action: string;
-  params: Record<string, string>;
-}
 
 function parseActiveKey(key: string):
   | { kind: "spotlight" }
@@ -113,53 +108,38 @@ export default function App() {
     };
   }, []);
 
-  // ── zbiz:// 深链路由（2026-10-26）─────────────────────────────────
+  // ── zbiz:// 深链路由（2026-10-26 接入，2026-10-31 改用共享层）───────
   //
   // 别的产品/脚本用 `zbiz://box/tool?key=<tool>` 唤起 box 时，Rust 把深链收进队列并
-  // emit("zbiz-open")。这里做两件事：
-  //   ① mount 时先 take 一次 —— 冷启动那条信号在监听挂上之前就发出去了，收不到；
-  //   ② 之后每次收到信号再 take，处理已运行实例被二次唤起的情况。
-  // take 是出队即清空，所以 ①② 同时发生也不会把同一条深链执行两遍。
+  // emit("zbiz-open")。
+  //
+  // **机制**（冷启动补取、事件监听、不静默吞掉）在共享层
+  // `z-biz-tool-shared/protocol` 的 `startDeepLinkReceiver` 里；
+  // **语义**（box 该切到哪个工具页）在本仓 `_shared/deepLink.ts`。
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    const drain = async () => {
-      try {
-        const items = await invoke<HandoffItem[]>("zbiz_take_pending");
-        for (const h of items) {
-          const key = h.params.key;
-          if (key && TOOL_KEYS.includes(key)) {
-            setActiveKey(key);
-            continue;
-          }
-          if (h.action === "open" && !key) {
-            // 只说要 box 但没点名的，回首页
-            setActiveKey("spotlight");
-            continue;
-          }
-          // 不认识的就留着日志 —— 静默吞掉会让「深链发了但没反应」无从排查
-          console.warn("[box] 收到未适配的深链", h);
+    const stop = startDeepLinkReceiver({
+      productId: "box",
+      invoke: () => invoke<HandoffItem[]>(ZBIZ_TAKE_PENDING),
+      listen: (event, handler) => listen(event, handler),
+      translate: (item) => {
+        const out = resolveBoxDeepLink(item, TOOL_KEYS);
+        if (out.problem) {
+          return { ok: false, problem: out.problem };
         }
-      } catch (e) {
-        console.warn("[box] 取深链队列失败（非 Tauri 环境属预期）", e);
-      }
-    };
-    void drain();
-    listen("zbiz-open", () => void drain())
-      .then((u) => {
-        if (disposed) {
-          u();
-          return;
-        }
-        unlisten = u;
-      })
-      .catch((e) => {
-        console.warn("[box] 订阅 zbiz-open 失败（非 Tauri 环境属预期）", e);
-      });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
+        return { ok: true, effect: { toolKey: out.toolKey } };
+      },
+      onProblem: (msg, item) => {
+        // 不认识的就留着日志 —— 静默吞掉会让「深链发了但没反应」无从排查
+        console.warn("[box] 收到未适配的深链", item, msg);
+        message.warning(msg);
+      },
+      onEffect: (effect) => {
+        const toolKey = effect.toolKey as string | null;
+        if (toolKey) setActiveKey(toolKey);
+      },
+      log: (msg, item) => console.debug("[box] 深链", msg, item),
+    });
+    return stop;
   }, []);
 
   useEffect(() => {

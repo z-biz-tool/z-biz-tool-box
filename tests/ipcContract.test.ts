@@ -27,6 +27,11 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import {
+  collectCmdConstants,
+  collectSharedConsumedCommands,
+} from "z-biz-tool-shared/testkit";
+import { DEEPLINK_EVENT } from "z-biz-tool-shared/protocol";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = path.resolve(here, "..");
@@ -92,18 +97,43 @@ function stripComments(src: string): string {
 
 /** 直接 invoke 后端命令的调用点：`invoke("x")` / `invoke<T>("x")` */
 const DIRECT_INVOKE = /\binvoke(?:<[^>]*>)?\s*\(\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/g;
+/**
+ * 命令名是**常量**的调用点：`invoke(X)` / `invoke<T>(X)`。
+ *
+ * 前端把命令名提成常量（`ZBIZ_TAKE_PENDING`）是为了拼错能在编译期报错。
+ * 只认字面量的扫描器会漏掉它 ⇒ 门禁把「已接线」误判成「没接线」。
+ */
+const DIRECT_INVOKE_CONST = /\binvoke(?:<[^>]*>)?\s*\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g;
 /** 前端 listen 的事件名 */
 const LISTEN_CALL = /\blisten(?:<[^>]*>)?\s*\(\s*["']([a-z][a-z0-9_-]*)["']/g;
 
 const frontendFiles = walk(path.join(repoRoot, "src"), [".ts", ".tsx"]);
+
+/** 命令名常量表（扫描器在共享层 testkit 里，各仓共用一份） */
+const cmdConstants = collectCmdConstants(frontendFiles);
 
 const directInvokes = new Set<string>();
 const listenedEvents = new Set<string>();
 for (const f of frontendFiles) {
   const src = stripComments(readFileSync(f, "utf8"));
   for (const m of src.matchAll(DIRECT_INVOKE)) directInvokes.add(m[1]);
+  for (const m of src.matchAll(DIRECT_INVOKE_CONST)) {
+    const resolved = cmdConstants.get(m[1]);
+    if (resolved) directInvokes.add(resolved);
+  }
   for (const m of src.matchAll(LISTEN_CALL)) listenedEvents.add(m[1]);
 }
+
+/**
+ * 经由**共享层**消费的 Rust 命令。
+ *
+ * 深链接收侧改用共享层后，取队列的 invoke 发生在共享层内部，
+ * 本仓源码扫不到那个调用点 ⇒ 门禁会误判「实现了却没人用」。
+ * **门禁失灵比测试挂掉更严重**：误报久了大家就会把命令塞进预留清单。
+ *
+ * 判据与清单都在共享层 testkit 里 —— 不在本仓写私有副本（那份会漂移）。
+ */
+const sharedConsumed = collectSharedConsumedCommands(frontendFiles);
 
 /** 插件桥层允许动态 invoke 的命令（命令名是变量 ⇒ 静态扫不到，只能读白名单） */
 function bridgeAllowlist(): string[] {
@@ -154,7 +184,8 @@ test("插件桥层白名单里的命令，后端必须真的注册了", () => {
 });
 
 test("后端注册的命令，要么被前端调用，要么在「预留未接线」清单里写明理由", () => {
-  const called = new Set<string>([...directInvokes, ...allowlist]);
+  // 共享层消费的也算「前端调用了」—— 见 sharedConsumed 的说明。
+  const called = new Set<string>([...directInvokes, ...allowlist, ...sharedConsumed]);
   const unaccounted = [...registered].filter(
     (c) => !called.has(c) && !RESERVED_NOT_WIRED.has(c)
   );
@@ -170,7 +201,13 @@ test("「预留未接线」清单：命令必须真的存在，且真的没被�
     assert.ok(why.length > 20, `${cmd} 的预留理由太短，等于没写`);
     assert.ok(registered.has(cmd), `${cmd} 后端已不存在 ⇒ 预留清单该删了`);
     assert.ok(!directInvokes.has(cmd), `${cmd} 已经被前端调用了 ⇒ 应从预留清单移除`);
+    assert.ok(!sharedConsumed.has(cmd), `${cmd} 已经通过共享层被消费了 ⇒ 应从预留清单移除`);
   }
+});
+
+test("共享层消费的每个命令都必须真实存在于后端（共享层登记写错 ⇒ 运行时才炸）", () => {
+  const bad = [...sharedConsumed].filter((c) => !registered.has(c));
+  assert.deepEqual(bad, [], `共享层消费了后端不存在的命令: ${bad.join(", ")}`);
 });
 
 test("Rust emit 的每个事件，前端必须 listen（发了没人收 ⇒ 界面毫无反应）", () => {
@@ -180,6 +217,13 @@ test("Rust emit 的每个事件，前端必须 listen（发了没人收 ⇒ 界�
     [],
     `Rust 发的事件前端没监听 ⇒ 事件发出去没有任何效果: ${bad.join(", ")}`
   );
+});
+
+test("共享层监听的事件名必须与 Rust 侧一致（cap-hub 改了事件名 ⇒ 静默失联）", () => {
+  // `zbiz-open` 是 cap-hub 发的（不在本仓 Rust 源码里）⇒ 上面那道门扫不到它。
+  // 这条把那类「事件由共享层/Rust 依赖仓发出」的情况显式钉住：
+  // 事件名对不上时，box 就再也收不到深链信号，而且**没有任何报错**。
+  assert.equal(DEEPLINK_EVENT, "zbiz-open", "共享层的事件名变了 ⇒ 需同步核对 cap-hub");
 });
 
 test("tray 工具链路是通的（这是本轮修的那个 P0，专门钉住）", () => {
