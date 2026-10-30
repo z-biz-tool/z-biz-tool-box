@@ -109,8 +109,9 @@ pub fn decode(value: &str) -> Result<String, String> {
             if i + 2 >= bytes.len() {
                 return Err(format!("百分号转义不完整: {value}"));
             }
-            let hi = hex_value(bytes[i + 1])
-                .ok_or_else(|| format!("非法十六进制: %{}", &value[i + 1..(i + 3).min(value.len())]))?;
+            let hi = hex_value(bytes[i + 1]).ok_or_else(|| {
+                format!("非法十六进制: %{}", &value[i + 1..(i + 3).min(value.len())])
+            })?;
             let lo = hex_value(bytes[i + 2]).ok_or_else(|| {
                 format!("非法十六进制: %{}", &value[i + 1..(i + 3).min(value.len())])
             })?;
@@ -142,9 +143,7 @@ fn check_token(what: &str, v: &str) -> Result<(), String> {
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
     {
-        return Err(format!(
-            "{what} 只允许字母/数字/-/_，实际: {v}"
-        ));
+        return Err(format!("{what} 只允许字母/数字/-/_，实际: {v}"));
     }
     Ok(())
 }
@@ -284,11 +283,14 @@ mod tests {
         let p = params(&[("file", "/tmp/a.md"), ("from", "box")]);
         let uri = build("note", "open", &p).unwrap();
         assert_eq!(uri, "zbiz://note/open?file=/tmp/a.md&from=box");
-        assert_eq!(parse(&uri).unwrap(), Handoff {
-            product: "note".into(),
-            action: "open".into(),
-            params: p,
-        });
+        assert_eq!(
+            parse(&uri).unwrap(),
+            Handoff {
+                product: "note".into(),
+                action: "open".into(),
+                params: p,
+            }
+        );
     }
 
     /// 中文与空格是最容易踩的两个：前者按字节转义不能截断多字节字符，
@@ -300,7 +302,10 @@ mod tests {
         assert!(uri.contains("%E6%96%87"), "中文应逐字节转义: {uri}");
         assert!(uri.contains("%20"), "空格应转义: {uri}");
         assert!(!uri.contains(' '), "深链里不能留裸空格: {uri}");
-        assert_eq!(parse(&uri).unwrap().file(), Some("/Users/zifang/文稿/季度 总结.md"));
+        assert_eq!(
+            parse(&uri).unwrap().file(),
+            Some("/Users/zifang/文稿/季度 总结.md")
+        );
     }
 
     /// 分隔符本身出现在值里时不能把协议拆散。`&` `=` `#` `+` 各来一个。

@@ -487,7 +487,8 @@ mod tests {
         if !app.is_dir() {
             return; // 本机没装就跳过,不编造断言
         }
-        let version = read_bundle_version(app).expect("已装的 note 必须读得出 CFBundleShortVersionString");
+        let version =
+            read_bundle_version(app).expect("已装的 note 必须读得出 CFBundleShortVersionString");
         let parts: Vec<&str> = version.split('.').collect();
         assert!(
             parts.len() >= 2 && parts.iter().all(|p| !p.is_empty()),
