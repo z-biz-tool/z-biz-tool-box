@@ -30,3 +30,12 @@ tauri-plugin-opener = "~2.5.5"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# 家族统一深链协议（cap-hub）：zbiz:// 的构造、解析、待处理队列与产品清单。
+#
+# 2026-10-30 由本仓私有 src/handoff.rs 迁出。原实现是 box 的私有副本，
+# 而 13 个兄弟仓的 single-instance 回调全是 `_argv`（丢弃）—— 协议只长在 box 里，
+# 别人就接不上。capability 仓是家族 Rust 依赖的唯一版本源，与 cap-doc / cap-llm 同构。
+#
+# "tauri" feature 打开 receiver 胶水层（AppHandle / 事件 / Tauri 命令）；
+# 核心协议是纯函数、零 tauri 依赖，可被非 Tauri 宿主直接复用。
+cap-hub = { path = "../../z-biz-tool-capability/crates/cap-hub", features = ["tauri"] }

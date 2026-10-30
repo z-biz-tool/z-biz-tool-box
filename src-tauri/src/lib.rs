@@ -1,5 +1,4 @@
 mod brother_tools;
-mod handoff;
 mod installer;
 mod logging;
 mod plugin_engine;
@@ -14,6 +13,10 @@ pub fn run() {
     // panic hook 要最先装: 后面任何一步 panic, 现场都还来得及落盘(台账 T4.7)
     logging::install_panic_hook();
 
+    // 深链队列。Arc 是必须的：既要 manage 出去给命令用，又要在下面的 setup 闭包里
+    // 拿去 seed 冷启动那一条 —— 两处必须指向同一份队列。
+    let handoff_pending = cap_hub::receiver::SharedPending::default();
+
     tauri::Builder::default()
         // 单实例（2026-10-26 分发底座）：第二次启动聚焦已有窗口，不再开新进程。
         // 必须作为第一个注册的插件（tauri-plugin-single-instance 官方要求）。
@@ -25,7 +28,7 @@ pub fn run() {
             }
             // 别的产品/脚本用 `zbiz://box/...` 唤起时，argv 就落在这里。
             // 这是「已运行实例」这一半，冷启动那一半在 setup 里 seed。
-            push_handoffs(app, argv);
+            cap_hub::receiver::handle_second_instance(app, &argv);
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -39,7 +42,7 @@ pub fn run() {
         // 更新安装完成后的「立即重启」
         .plugin(tauri_plugin_process::init())
         // 深链队列：冷启动 seed 与 second-instance 转发都写它
-        .manage(handoff::Pending::default())
+        .manage(handoff_pending.clone())
         .invoke_handler(tauri::generate_handler![
             register_tools,
             plugin_engine::http_request,
@@ -49,11 +52,11 @@ pub fn run() {
             installer::brother_overview,
             installer::install_brother,
             installer::launch_brother,
-            handoff_take_pending,
+            zbiz_take_pending,
             logging::write_log,
             logging::open_log_dir,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
             #[cfg(target_os = "macos")]
             {
@@ -62,7 +65,7 @@ pub fn run() {
 
             // 深链队列必须早于下面的 tray 构建：冷启动的 argv 要在任何 UI 之前收进来，
             // 否则前端挂载后 take 一次会拿到空。
-            push_handoffs(app.handle(), std::env::args().skip(1).collect());
+            cap_hub::receiver::seed_cold_start(app.handle(), &handoff_pending);
 
             // 启动时先建 tray:内置工具占位"加载中…"+ 兄弟应用清单(用兄弟全量初检一次,
             // 让菜单第一次弹出就显示真实可用状态,避免闪烁)
@@ -226,31 +229,20 @@ fn _unused() {
 }
 
 // ── zbiz:// 深链接线 ──────────────────────────────────────────────────────
+//
+// 2026-10-30 起整条线由 cap-hub 提供：
+//   · 协议编解码 / 待处理队列  → cap_hub（纯函数，零 tauri 依赖）
+//   · Tauri 胶水层（事件 / 命令）→ cap_hub::receiver
+// 本仓只保留「box 特有」的部分：前端按 params.key 路由到对应工具。
+//
+// 队列是「取走即清空」的，所以「收到信号」和「启动时主动取」不会重复执行。
 
-/// 把 argv 里的深链塞进队列，并喊前端来取。
+/// 前端把队列取空。取走即清空。
 ///
-/// 两条触发共用它：冷启动（setup 里 seed 一次）与已运行实例
-/// （single-instance 回调把新进程的 argv 转进来）。
-fn push_handoffs(app: &tauri::AppHandle, argv: Vec<String>) {
-    let items = handoff::from_args(argv);
-    if items.is_empty() {
-        return;
-    }
-    for h in &items {
-        eprintln!(
-            "[z-biz] handoff 收到: zbiz://{}/{} params={:?}",
-            h.product, h.action, h.params
-        );
-    }
-    let added = app.state::<handoff::Pending>().push(items);
-    if added > 0 {
-        // 冷启动时前端还没挂监听，这条会丢——前端 mount 后主动 take 一次兜住。
-        let _ = app.emit(handoff::EVENT, ());
-    }
-}
-
-/// 前端把队列取空。取走即清空，所以「收到信号」和「启动时主动取」不会重复执行。
+/// 命令名家族统一为 `zbiz_take_pending`（各仓同名）。
 #[tauri::command]
-fn handoff_take_pending(state: tauri::State<handoff::Pending>) -> Vec<handoff::Handoff> {
-    state.take()
+fn zbiz_take_pending(
+    state: tauri::State<cap_hub::receiver::SharedPending>,
+) -> Vec<cap_hub::Handoff> {
+    cap_hub::receiver::take_pending_from(state.inner())
 }

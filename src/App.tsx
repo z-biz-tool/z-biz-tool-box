@@ -17,7 +17,7 @@ import { radius, shadow, size, motion } from "./_shared/designTokens";
 /** tray 只推内置工具 ⇒ 可路由的 key 集合在模块加载时就固定 */
 const TOOL_KEYS = ALL_TOOLS.map((t) => t.key);
 
-/** Rust 侧 `handoff::Handoff` 的镜像（serde 默认字段名，不做 camelCase） */
+/** Rust 侧 `cap_hub::Handoff` 的镜像（serde 默认字段名，不做 camelCase） */
 interface HandoffItem {
   product: string;
   action: string;
@@ -125,7 +125,7 @@ export default function App() {
     let disposed = false;
     const drain = async () => {
       try {
-        const items = await invoke<HandoffItem[]>("handoff_take_pending");
+        const items = await invoke<HandoffItem[]>("zbiz_take_pending");
         for (const h of items) {
           const key = h.params.key;
           if (key && TOOL_KEYS.includes(key)) {

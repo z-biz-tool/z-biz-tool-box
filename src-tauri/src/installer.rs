@@ -376,7 +376,7 @@ pub fn launch_brother(key: String, target: Option<LaunchTarget>) -> Result<(), S
     params.insert("from".to_string(), "box".to_string());
 
     let action = target.action.as_deref().unwrap_or("open");
-    let uri = crate::handoff::build(&b.key, action, &params)?;
+    let uri = cap_hub::build(&b.key, action, &params)?;
     crate::brother_tools::launch_uri(&path, &uri)
 }
 
