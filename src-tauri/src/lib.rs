@@ -4,7 +4,7 @@ mod logging;
 mod plugin_engine;
 mod tray;
 
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tray::{create_tray, refresh_menu, show_main_window, toggle_main_window, GroupEntry};
 
