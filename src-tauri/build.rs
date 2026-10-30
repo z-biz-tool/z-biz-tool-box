@@ -107,14 +107,39 @@ fn parse_manifest(path: &Path) -> Result<Vec<BrotherSeed>, String> {
     Ok(out)
 }
 
-/// 菜单里显示的名字：取 purpose 首段；但若首段是「slug 形态」就退回仓名短形式。
-/// slug 形态 = 含 - 或 _ 且没有大写字母，用来识别 pet 那种
-/// "z-biz-companion-pet-cos — 桌面宠物 + ..." 的英文连字符前缀。
-/// 不能拿「有没有中文」当判据 —— ZenNote / GeoLab 这类正经产品名不含中文，
-/// 那样会被误伤成 "note" / "math"。
+/// 菜单里显示的名字：取 purpose 首段，再做两处清理。
+///
+/// 清理一：剥掉开头的 【…】。那是仓的**状态标注**不是名字，例如 kb 的
+///   "【已并入 note，维护冻结】知识管理 + RAG 问答（…）" —— 公告不该进菜单。
+/// 清理二：剥掉结尾的 （…）。那是补充说明，例如 mind 的
+///   "思维导图桌面工具（对标亿图脑图 MindMaster）" —— 菜单里要短名。
+///
+/// 若剥完还像 slug（全小写带连字符，如 pet 的 "z-biz-companion-pet-cos"），
+/// 退回仓名短形式。
 fn display_label(purpose: &str, repo_name: &str) -> String {
-    let head = first_segment(purpose);
-    if looks_like_slug(&head) {
+    let mut head = first_segment(purpose);
+
+    // 剥前导 【…】
+    if head.starts_with('【') {
+        if let Some(end) = head.find('】') {
+            head = head[end + '】'.len_utf8()..].trim_start().to_string();
+        }
+    }
+    // 剥尾部 （…）或 (…) —— 只剥最后一组，且要求它紧挨结尾
+    for (open, close) in [('（', '）'), ('(', ')')] {
+        if head.ends_with(close) {
+            if let Some(start) = head.rfind(open) {
+                // rfind 可能找到中间的括号；要求其后没有别的括号起始，否则不剥
+                let inner = &head[start + open.len_utf8()..head.len() - close.len_utf8()];
+                if !inner.contains(open) {
+                    head = head[..start].trim_end().to_string();
+                    break;
+                }
+            }
+        }
+    }
+
+    if head.is_empty() || looks_like_slug(&head) {
         return repo_name
             .strip_prefix("z-biz-tool-")
             .unwrap_or(repo_name)
