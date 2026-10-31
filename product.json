@@ -1,0 +1,15 @@
+{
+  "id": "box",
+  "displayName": "插件化桌面工具箱",
+  "description": "27 内置工具 + 外部插件，兼作家族应用面板与启动中枢",
+  "acceptsDeepLink": true,
+  "actions": [
+    "open"
+  ],
+  "keywords": [
+    "工具箱",
+    "插件",
+    "家族",
+    "启动器"
+  ]
+}
