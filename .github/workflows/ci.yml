@@ -97,7 +97,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy
 
@@ -118,7 +118,7 @@ jobs:
       # 于是按原注释里写的条件（「跑出干净结果后再收严」）把它转成硬门禁。
       # 为什么要硬门禁：advisory 形态下 clippy 从来没真正挡过任何东西 ——
       # 告警照出、流水线照绿，等于没有门禁。
-      # 诚实说明风险：CI 用 `dtolnay/rust-toolchain@stable`，stable 升级会带进**新的 lint**
+      # 诚实说明风险：CI 用 `dtolnay/rust-toolchain@1.99.0`，stable 升级会带进**新的 lint**
       # （本轮就撞上 Rust 1.98 新增的 `clippy::doc_lazy_continuation`），
       # 那时 CI 会红 —— 这是刻意的：宁可因为工具链前进而红，也不要悄悄漂移。
       - name: Clippy (warnings are errors)
