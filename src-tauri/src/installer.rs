@@ -320,10 +320,8 @@ pub fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String>
 /// 面板上「安装/更新」按钮的落点。阻塞动作丢到后台线程,免得冻住窗口。
 #[tauri::command]
 pub fn install_brother(app: AppHandle, key: String) -> Result<(), String> {
-    let seed = crate::brother_tools::all_brothers_with_state()
-        .into_iter()
-        .find(|b| b.key == key)
-        .ok_or_else(|| format!("未知兄弟应用: {key}"))?;
+    let seed =
+        crate::brother_tools::find_by_key(&key).ok_or_else(|| format!("未知兄弟应用: {key}"))?;
 
     tauri::async_runtime::spawn_blocking(move || {
         if let Err(e) = install_inner(&app, &seed) {
@@ -351,10 +349,8 @@ pub struct LaunchTarget {
 
 #[tauri::command]
 pub fn launch_brother(key: String, target: Option<LaunchTarget>) -> Result<(), String> {
-    let b = crate::brother_tools::all_brothers_with_state()
-        .into_iter()
-        .find(|b| b.key == key)
-        .ok_or_else(|| format!("未知兄弟应用: {key}"))?;
+    let b =
+        crate::brother_tools::find_by_key(&key).ok_or_else(|| format!("未知兄弟应用: {key}"))?;
     let path = b
         .installed_path
         .ok_or_else(|| format!("{} 未安装", b.display_name))?;

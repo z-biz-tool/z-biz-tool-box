@@ -65,6 +65,21 @@ pub fn all_brothers_with_state() -> Vec<BrotherEntry> {
     out
 }
 
+/// 只探测一个兄弟。菜单点击/启动这类「key 已知」的路径不该全量扫：
+/// 未装机器上每项要起一次 mdfind（实测 ~40ms），14 项就是半秒的菜单回调冻结。
+pub fn find_by_key(key: &str) -> Option<BrotherEntry> {
+    let seed = generated::GENERATED_BROTHERS
+        .iter()
+        .find(|s| s.key == key)?;
+    let mut entry = BrotherEntry::from_seed(seed);
+    entry.installed_path = detect_one(&entry.bundle_id, &entry.name);
+    entry.installed_version = entry
+        .installed_path
+        .as_deref()
+        .and_then(read_bundle_version);
+    Some(entry)
+}
+
 /// 从 <app>/Contents/Info.plist 读 CFBundleShortVersionString。
 /// 不引 plist crate:只按 <key>…</key><string>…</string> 的成对结构取值,
 /// 兄弟仓的 Info.plist 都是 tauri-build 生成的规整单层 plist。
@@ -473,6 +488,104 @@ mod tests {
             Some("com.zifang.z-biz-tool-note")
         );
         assert_eq!(plist_string_value(PLIST, "CFBundleVersion"), None);
+    }
+
+    #[test]
+    fn filename_whitelist_blocks_separators() {
+        assert!(is_safe_filename("z-biz-tool-note"));
+        assert!(is_safe_filename("a.b_c-d9"));
+        for bad in ["", "../x", "a/b", "a b", "a;rm", "中文"] {
+            assert!(!is_safe_filename(bad), "{bad:?} 不该过白名单");
+        }
+    }
+
+    /// 构建产物不是装机。这条守的是 2026-10-11 的实测事故：mdfind 把
+    /// `src-tauri/target/release/bundle/macos/*.app` 当成已装，召唤会拉起僵尸副本。
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn build_artifacts_are_not_installed_copies() {
+        assert!(is_build_artifact(Path::new(
+            "/Users/x/z-biz-tool-note/src-tauri/target/release/bundle/macos/z-biz-tool-note.app"
+        )));
+        assert!(is_build_artifact(Path::new("/tmp/app/node_modules/x.app")));
+        assert!(is_build_artifact(Path::new("/tmp/app/dist/x.app")));
+        assert!(!is_build_artifact(Path::new(
+            "/Applications/z-biz-tool-note.app"
+        )));
+        assert!(!is_build_artifact(Path::new(
+            "/Users/x/Applications/target-not-a-component.app"
+        )));
+    }
+
+    /// 守 manifest.json → codegen 的漂移：改了清单却没重新 build，生成文件是旧的；
+    /// 或者 build.rs 没找到清单、静默退化成空列表。两种都该在这里红。
+    #[test]
+    fn generated_list_matches_manifest() {
+        let path = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../z-biz-tool-lead/003_辅助能力/bootstrap/manifest.json"
+        ));
+        let Ok(raw) = fs::read_to_string(path) else {
+            return; // 没一把 clone lead 仓：无从比对，不编造断言
+        };
+        let v: serde_json::Value = serde_json::from_str(&raw).expect("manifest.json 应是合法 JSON");
+        let repos = v["repositories"].as_array().expect("应有 repositories[]");
+
+        const SUMMONABLE: [&str; 3] = ["product", "product-local", "product-electron"];
+        let expected: Vec<&serde_json::Value> = repos
+            .iter()
+            .filter(|r| SUMMONABLE.contains(&r["type"].as_str().unwrap_or("")))
+            .filter(|r| r["name"].as_str() != Some("z-biz-tool-box"))
+            .filter(|r| r["bundle_id"].as_str().is_some_and(|s| !s.is_empty()))
+            .collect();
+
+        let actual = &generated::GENERATED_BROTHERS;
+        let actual_names: Vec<&str> = actual.iter().map(|b| b.name).collect();
+        let expected_names: Vec<&str> = expected
+            .iter()
+            .map(|r| r["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            actual_names, expected_names,
+            "兄弟清单与 manifest 不一致 —— 改了清单要重新 build"
+        );
+
+        for (b, r) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                b.bundle_id,
+                r["bundle_id"].as_str().unwrap(),
+                "{} 的 bundle_id 漂了",
+                b.name
+            );
+            assert_eq!(b.key, b.name.strip_prefix("z-biz-tool-").unwrap_or(b.name));
+            // 菜单要短名：公告【…】和补充说明（…）都不该漏进 display_name
+            assert!(!b.display_name.is_empty(), "{} 显示名为空", b.name);
+            assert!(
+                !b.display_name.contains('【'),
+                "{} 显示名带状态标注: {}",
+                b.name,
+                b.display_name
+            );
+            assert!(
+                !b.display_name.contains('（'),
+                "{} 显示名带补充说明: {}",
+                b.name,
+                b.display_name
+            );
+            assert!(
+                b.display_name.chars().count() <= 24,
+                "{} 显示名过长({} 字): {}",
+                b.name,
+                b.display_name.chars().count(),
+                b.display_name
+            );
+        }
+
+        let mut keys: Vec<&str> = actual.iter().map(|b| b.key).collect();
+        keys.sort_unstable();
+        let before = keys.len();
+        keys.dedup();
+        assert_eq!(before, keys.len(), "key 重复，菜单 id 会互相覆盖");
     }
 
     /// 版本号是更新检测的比对基准,读错会让面板一直报「可更新」或永远不报。

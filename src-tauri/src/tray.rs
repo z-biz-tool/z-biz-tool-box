@@ -68,13 +68,11 @@ fn build_menu<R: Runtime>(
         brothers_sub.append(&empty)?;
     } else {
         for b in brothers {
-            let (label, enabled) = if b.installed_path.is_some() {
-                (format!("📦 {}", b.display_name), true)
-            } else {
-                (format!("☁️ {} (未安装)", b.display_name), true)
-            };
+            let label = brother_menu_label(&b.display_name, b.installed_path.is_some());
             let id = format!("{BROTHER_ID_PREFIX}{}", b.key);
-            brothers_sub.append(&MenuItem::with_id(app, &id, &label, enabled, None::<&str>)?)?;
+            // 未装也是 enabled: 原生菜单的 disabled 项不派发 on_menu_event，
+            // 那样「点了进面板装」就无从实现。状态交给 label 前缀表达。
+            brothers_sub.append(&MenuItem::with_id(app, &id, &label, true, None::<&str>)?)?;
         }
         brothers_sub.append(&PredefinedMenuItem::separator(app)?)?;
         brothers_sub.append(&MenuItem::with_id(
@@ -94,6 +92,16 @@ fn build_menu<R: Runtime>(
     menu.append(&quit)?;
 
     Ok(menu)
+}
+
+/// 兄弟项在菜单里的文案。「未安装」必须是 Literal 文字而不是靠置灰：
+/// disabled 项不派发点击事件，用户点了没反应比不给提示更差。
+fn brother_menu_label(display_name: &str, installed: bool) -> String {
+    if installed {
+        format!("📦 {display_name}")
+    } else {
+        format!("☁️ {display_name} (未安装)")
+    }
 }
 
 /// 唤起主窗口并聚焦
@@ -205,8 +213,7 @@ pub fn create_tray<R: Runtime>(
 
 /// 兄弟应用菜单点击处理 — 安装的 launch,未装的打开主窗口的「家族应用」面板并高亮
 fn handle_brother_click<R: Runtime>(app: &AppHandle<R>, key: &str) {
-    let brothers = crate::brother_tools::all_brothers_with_state();
-    if let Some(b) = brothers.iter().find(|b| b.key == key) {
+    if let Some(b) = crate::brother_tools::find_by_key(key) {
         match &b.installed_path {
             Some(path) => {
                 if let Err(e) = crate::brother_tools::launch(path) {
@@ -234,4 +241,20 @@ pub fn refresh_menu<R: Runtime>(
         tray.set_menu(Some(menu))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn installed_and_missing_brothers_read_differently() {
+        assert_eq!(brother_menu_label("AI 任务看板", true), "📦 AI 任务看板");
+        assert_eq!(
+            brother_menu_label("AI 任务看板", false),
+            "☁️ AI 任务看板 (未安装)"
+        );
+        // 已装项不带状态后缀，否则每次点开菜单都在噪音里找名字
+        assert!(!brother_menu_label("ZenNote", true).contains("未安装"));
+    }
 }

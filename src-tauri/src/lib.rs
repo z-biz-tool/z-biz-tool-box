@@ -1,4 +1,7 @@
 mod brother_tools;
+// 只在测试构建里编译：生产路径由 build.rs 直接包含同一份源码（见该文件头注释）
+#[cfg(test)]
+mod brother_label;
 mod installer;
 mod logging;
 mod plugin_engine;
