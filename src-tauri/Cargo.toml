@@ -10,26 +10,32 @@ name = "z_biz_tool_box_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+# 同上，钉 ~ 免得 tauri-build 被顶到新 minor 后与 tauri 运行时错配
+tauri-build = { version = "~2.7.4", features = [] }
 serde_json = "1"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "protocol-asset"] }
-tauri-plugin-clipboard-manager = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
+# Tauri 系依赖全部钉到 ~（不是 caret）：
+#   tauri-cli 会比对 NPM 包与 Rust crate 的 major/minor，不一致直接拒绝 build。
+#   caret（"2"）会让 cargo 解析到最新 minor，下次 cargo update 就把 crate 顶到
+#   2.13/2.14，而前端 @tauri-apps/* 还钉在旧 minor —— 又一次错配。
+#   锁在 ~ 里 minor 不会漂，两侧对得上的状态就能一直成立。
+tauri = { version = "~2.12.5", features = ["tray-icon", "image-png", "protocol-asset"] }
+tauri-plugin-clipboard-manager = "~2.3.2"
+tauri-plugin-dialog = "~2.7.2"
+tauri-plugin-fs = "~2.5.1"
+tauri-plugin-shell = "~2.3.5"
+tauri-plugin-global-shortcut = "~2.3.2"
+tauri-plugin-http = { version = "~2.5.9", features = ["unsafe-headers"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.2"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 chrono = "0.4"
 tauri-plugin-opener = "~2.5.5"
-tauri-plugin-single-instance = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
+tauri-plugin-single-instance = "~2.5.4"
+tauri-plugin-updater = "~2.14.0"
+tauri-plugin-process = "~2.4.0"
 # 家族统一深链协议（cap-hub）：zbiz:// 的构造、解析、待处理队列与产品清单。
 #
 # 2026-10-30 由本仓私有 src/handoff.rs 迁出。原实现是 box 的私有副本，

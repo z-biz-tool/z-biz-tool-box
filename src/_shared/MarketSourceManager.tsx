@@ -44,9 +44,11 @@ import type { MarketSource } from "../plugins/external/types";
 export interface MarketSourceManagerProps {
   open: boolean;
   onClose: () => void;
+  /** 嵌在 Spotlight 右栏里时不用 Modal，直接把内容铺成一页 */
+  inline?: boolean;
 }
 
-export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps) {
+export function MarketSourceManager({ open, onClose, inline = false }: MarketSourceManagerProps) {
   const sources = useUiStore((s) => s.marketSources);
   const addMarketSource = useUiStore((s) => s.addMarketSource);
   const removeMarketSource = useUiStore((s) => s.removeMarketSource);
@@ -102,14 +104,8 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
     setRefreshing((m) => ({ ...m, [src.id]: false }));
   };
 
-  return (
-    <Modal
-      title="管理市场源"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={760}
-    >
+  const body = (
+    <>
       <Alert
         type="info"
         showIcon
@@ -306,6 +302,50 @@ export function MarketSourceManager({ open, onClose }: MarketSourceManagerProps)
         规范: GET {"{base}/list"} → 顶层含 schemaVersion=1 / name / plugins[]。
         每个 plugin 必须有 id / name / version, 下载时按 {"{base}/plugins/{id}/plugin.json + main.html"} 拼。
       </Typography.Text>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--ant-color-bg-container)",
+          // 嵌在 Spotlight 右栏时，左导航还在 ⇒ 这里自己滚动，不撑高整页
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--ant-color-border-secondary)",
+            flexShrink: 0,
+          }}
+        >
+          <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
+            市场源管理
+          </Typography.Text>
+        </div>
+        <div className="zBizScroll" style={{ flex: 1, overflow: "auto", padding: "16px 24px" }}>
+          {body}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal
+      title="管理市场源"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={760}
+    >
+      {body}
     </Modal>
   );
 }

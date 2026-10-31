@@ -7,10 +7,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Empty, Progress, Spin, Tag, Tooltip, Typography, message } from "antd";
+import { Alert, Button, Card, Empty, Progress, Spin, Tag, Tooltip, Typography, message } from "antd";
 import {
   ArrowLeftOutlined,
   CloudDownloadOutlined,
+  CloudSyncOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
@@ -64,10 +65,25 @@ interface InstallProgress {
   message: string | null;
 }
 
+interface BatchProgress {
+  key: string;
+  displayName: string;
+  index: number;
+  total: number;
+}
+
+interface BatchUpdateResult {
+  updated: string[];
+  failed: { key: string; name: string; message: string }[];
+  skipped: number;
+}
+
 interface BrothersViewProps {
   onBack: () => void;
   /** tray 点某个未装兄弟进来时带上的 key, 滚到并高亮那张卡 */
   highlightKey?: string | null;
+  /** 嵌在 Spotlight 右栏里：不占满窗口、不出返回按钮（左导航还在） */
+  embedded?: boolean;
 }
 
 const STATE_LABEL: Record<ReleaseState, { text: string; color: string }> = {
@@ -78,14 +94,19 @@ const STATE_LABEL: Record<ReleaseState, { text: string; color: string }> = {
   unreachable: { text: "查询失败", color: "red" },
 };
 
-export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
+export function BrothersView({ onBack, highlightKey, embedded = false }: BrothersViewProps) {
   const [cards, setCards] = useState<BrotherCard[] | null>(null);
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({});
+  /** 一键更新进行到哪一个（index/total 由 Rust 侧 emit） */
+  const [batch, setBatch] = useState<BatchProgress | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchUpdateResult | null>(null);
   const [msgApi, contextHolder] = message.useMessage();
   /** 拖文件进来时，指针悬在哪张卡上（用于高亮落点） */
   const [dragKey, setDragKey] = useState<string | null>(null);
   /** 名字要用于提示文案，但拖放订阅不该因列表刷新而重建 ⇒ 走 ref */
   const cardsRef = useRef<BrotherCard[] | null>(null);
+  /** 一键更新是否在跑。事件订阅不该因状态变化重建 ⇒ 同样走 ref */
+  const batchRef = useRef<BatchProgress | null>(null);
 
   useEffect(() => {
     cardsRef.current = cards;
@@ -121,7 +142,8 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
         // 装完兄弟应用后 tray 的「兄弟应用」子菜单要跟着更新 ——
         // 那份清单是 Rust 侧扫出来的,前端不推一次它就一直显示装之前的状态。
         void pushTrayTools();
-        msgApi.success("安装完成");
+        // 批量更新时逐条弹「安装完成」会刷屏，最终由汇总条统一交代
+        if (!batchRef.current) msgApi.success("安装完成");
       }
       if (p.phase === "error") {
         setProgress((prev) => {
@@ -129,13 +151,34 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
           delete next[p.key];
           return next;
         });
-        msgApi.error(p.message ?? "安装失败");
+        if (!batchRef.current) msgApi.error(p.message ?? "安装失败");
       }
-    }).then((u) => {
-      unlisten = u;
-    });
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((e) => {
+        console.warn("[box] 订阅安装进度失败（非 Tauri 环境属预期）", e);
+      });
     return () => unlisten?.();
   }, [load, msgApi]);
+
+  // 一键更新逐个推进：Rust 侧在开始每个应用时 emit 一次 index/total
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<BatchProgress>("brother-batch-progress", (e) => {
+      if (!batchRef.current) return;
+      batchRef.current = e.payload;
+      setBatch(e.payload);
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((e) => {
+        console.warn("[box] 订阅批量更新进度失败（非 Tauri 环境属预期）", e);
+      });
+    return () => unlisten?.();
+  }, []);
 
   // tray 带 key 进来时把那张卡滚进视野
   useEffect(() => {
@@ -157,6 +200,29 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
       await invoke("launch_brother", { key: card.key });
     } catch (e) {
       msgApi.error("启动失败: " + e);
+    }
+  };
+
+  /**
+   * 一键更新：Rust 侧按顺序把「已装且远端更高」的逐个更新完，
+   * 这里只用 batch-progress 显示「正在更新谁」，结果等命令返回后汇总。
+   */
+  const updateAll = async () => {
+    if (batchRef.current) return;
+    setBatchResult(null);
+    const start: BatchProgress = { key: "", displayName: "", index: 0, total: 0 };
+    batchRef.current = start;
+    setBatch(start);
+    try {
+      const r = await invoke<BatchUpdateResult>("update_all_brothers");
+      setBatchResult(r);
+      await load(false);
+      void pushTrayTools();
+    } catch (e) {
+      msgApi.error("一键更新失败: " + e);
+    } finally {
+      batchRef.current = null;
+      setBatch(null);
     }
   };
 
@@ -193,33 +259,39 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    getCurrentWebview()
-      .onDragDropEvent((event) => {
-        const p = event.payload;
-        if (p.type === "enter" || p.type === "over") {
-          setDragKey(keyAtPointer(p.position));
-          return;
-        }
-        if (p.type === "drop") {
-          const key = keyAtPointer(p.position);
+    try {
+      getCurrentWebview()
+        .onDragDropEvent((event) => {
+          const p = event.payload;
+          if (p.type === "enter" || p.type === "over") {
+            setDragKey(keyAtPointer(p.position));
+            return;
+          }
+          if (p.type === "drop") {
+            const key = keyAtPointer(p.position);
+            setDragKey(null);
+            const file = p.paths[0];
+            if (key && file) void launchWithFile(key, file);
+            return;
+          }
           setDragKey(null);
-          const file = p.paths[0];
-          if (key && file) void launchWithFile(key, file);
-          return;
-        }
-        setDragKey(null);
-      })
-      .then((u) => {
-        if (disposed) {
-          u();
-          return;
-        }
-        unlisten = u;
-      })
-      .catch((e) => {
-        // 纯浏览器预览没有拖放事件；桌面版失败只影响「拖文件交接」这一条捷径
-        console.warn("[box] 订阅拖放事件失败（非 Tauri 环境属预期）", e);
-      });
+        })
+        .then((u) => {
+          if (disposed) {
+            u();
+            return;
+          }
+          unlisten = u;
+        })
+        .catch((e) => {
+          // 纯浏览器预览没有拖放事件；桌面版失败只影响「拖文件交接」这一条捷径
+          console.warn("[box] 订阅拖放事件失败（非 Tauri 环境属预期）", e);
+        });
+    } catch (e) {
+      // getCurrentWebview() 在纯浏览器里是同步抛错（不等 promise 拒绝），
+      // 不接住会一路冒到 React 渲染，把整棵树卸掉。
+      console.warn("[box] 非 Tauri 环境，跳过拖放订阅", e);
+    }
     return () => {
       disposed = true;
       unlisten?.();
@@ -229,61 +301,147 @@ export function BrothersView({ onBack, highlightKey }: BrothersViewProps) {
   const installedCount = cards?.filter((c) => c.installed).length ?? 0;
   const updateCount = cards?.filter((c) => c.hasUpdate).length ?? 0;
 
+  const reloadBtn = (
+    <Tooltip title="重新检查更新">
+      <Button
+        size="small"
+        type="text"
+        icon={<ReloadOutlined />}
+        aria-label="重新检查更新"
+        onClick={() => void load(true)}
+        style={{ width: 28, height: 28, borderRadius: 8 }}
+      />
+    </Tooltip>
+  );
+
+  const headerTitle = (
+    <>
+      <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
+        家族应用
+      </Typography.Text>
+      {cards && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          已装 {installedCount}/{cards.length}
+          {updateCount > 0 && ` · ${updateCount} 个可更新`}
+        </Typography.Text>
+      )}
+      {batch && (
+        <Typography.Text style={{ fontSize: 12, color: "var(--ant-color-primary)" }}>
+          {batch.total > 0
+            ? `正在更新「${batch.displayName}」(${batch.index}/${batch.total})`
+            : "正在准备更新…"}
+        </Typography.Text>
+      )}
+      {!batch && dragKey && (
+        <Typography.Text style={{ fontSize: 12, color: "var(--ant-color-primary)" }}>
+          松开即用「{cardsRef.current?.find((c) => c.key === dragKey)?.displayName ?? dragKey}
+          」打开
+        </Typography.Text>
+      )}
+    </>
+  );
+
+  const updateAllBtn = (
+    <Tooltip
+      title={
+        updateCount > 0
+          ? `逐个更新 ${updateCount} 个有新版的应用`
+          : "当前没有可更新的应用"
+      }
+    >
+      <Button
+        size="small"
+        type={updateCount > 0 ? "primary" : "default"}
+        icon={<CloudSyncOutlined />}
+        disabled={updateCount === 0 || !!batch}
+        loading={!!batch}
+        onClick={() => void updateAll()}
+        style={{ borderRadius: 8 }}
+      >
+        一键更新{updateCount > 0 ? ` (${updateCount})` : ""}
+      </Button>
+    </Tooltip>
+  );
+
   return (
     <div
       data-tauri-drag-region
       style={{
-        height: "100vh",
+        height: embedded ? "100%" : "100vh",
         display: "flex",
         flexDirection: "column",
         background: "var(--ant-color-bg-container)",
       }}
     >
       {contextHolder}
-      <DragHandle
-        right={
-          <Tooltip title="重新检查更新">
-            <Button
-              size="small"
-              type="text"
-              icon={<ReloadOutlined />}
-              aria-label="重新检查更新"
-              onClick={() => void load(true)}
-              style={{ width: 28, height: 28, borderRadius: 8 }}
-            />
-          </Tooltip>
-        }
-      >
-        <Button
-          size="small"
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          aria-label="返回"
-          onClick={onBack}
-          style={{ width: 28, height: 28, borderRadius: 8 }}
-          title="返回 (esc)"
-        />
-        <Typography.Text strong style={{ fontSize: 14, fontWeight: 600 }}>
-          家族应用
-        </Typography.Text>
-        {cards && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            已装 {installedCount}/{cards.length}
-            {updateCount > 0 && ` · ${updateCount} 个可更新`}
-          </Typography.Text>
-        )}
-        {dragKey && (
-          <Typography.Text style={{ fontSize: 12, color: "var(--ant-color-primary)" }}>
-            松开即用「{cardsRef.current?.find((c) => c.key === dragKey)?.displayName ?? dragKey}
-            」打开
-          </Typography.Text>
-        )}
-      </DragHandle>
+      {embedded ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--ant-color-border-secondary)",
+            flexShrink: 0,
+          }}
+        >
+          {headerTitle}
+          <span style={{ flex: 1 }} />
+          {updateAllBtn}
+          {reloadBtn}
+        </div>
+      ) : (
+        <DragHandle
+          right={
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {updateAllBtn}
+              {reloadBtn}
+            </div>
+          }
+        >
+          <Button
+            size="small"
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            aria-label="返回"
+            onClick={onBack}
+            style={{ width: 28, height: 28, borderRadius: 8 }}
+            title="返回 (esc)"
+          />
+          {headerTitle}
+        </DragHandle>
+      )}
 
       <div
         className="zBizScroll"
         style={{ flex: 1, overflow: "auto", padding: 16, background: "var(--ant-color-bg-layout)" }}
       >
+        {batchResult && (
+          <Alert
+            style={{ marginBottom: 12 }}
+            type={batchResult.failed.length > 0 ? "warning" : "success"}
+            showIcon
+            closable
+            onClose={() => setBatchResult(null)}
+            message={`一键更新完成：成功 ${batchResult.updated.length} 个${
+              batchResult.failed.length > 0 ? `，失败 ${batchResult.failed.length} 个` : ""
+            }，跳过 ${batchResult.skipped} 个`}
+            description={
+              batchResult.failed.length > 0 ? (
+                <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                  {batchResult.failed.map((f) => (
+                    <div key={f.key}>
+                      <Typography.Text strong style={{ fontSize: 12 }}>
+                        {f.name}
+                      </Typography.Text>
+                      ：{f.message}
+                    </div>
+                  ))}
+                </div>
+              ) : undefined
+            }
+          />
+        )}
         {cards === null ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
             <Spin tip="正在检查 GitHub 上的最新版本…">

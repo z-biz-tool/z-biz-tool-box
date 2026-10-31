@@ -7,6 +7,8 @@ import { useUiStore } from "../stores/uiStore";
 
 interface PreferencesViewProps {
   onBack: () => void;
+  /** 嵌在 Spotlight 右栏里：只占右栏高度，标题栏不出返回按钮 */
+  embedded?: boolean;
 }
 
 interface Prefs {
@@ -55,7 +57,7 @@ function savePrefs(p: Prefs) {
  * 偏好设置视图 — 简洁的设置面板,所有项立即写入 localStorage。
  * 设计目标: 不依赖 Rust 端 / Tauri store,纯前端可工作,后续可平滑迁移。
  */
-export function PreferencesView({ onBack }: PreferencesViewProps) {
+export function PreferencesView({ onBack, embedded = false }: PreferencesViewProps) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const { mode, setMode } = useTheme();
   const [msgApi, contextHolder] = message.useMessage();
@@ -148,14 +150,14 @@ export function PreferencesView({ onBack }: PreferencesViewProps) {
     <div
       data-tauri-drag-region
       style={{
-        height: "100vh",
+        height: embedded ? "100%" : "100vh",
         display: "flex",
         flexDirection: "column",
         background: "var(--ant-color-bg-container)",
       }}
     >
       {contextHolder}
-      <TopBar title="偏好设置" onBack={onBack} />
+      <TopBar title="偏好设置" onBack={embedded ? undefined : onBack} />
       <div
         className="zBizScroll"
         style={{
@@ -339,7 +341,7 @@ function Hint({ text }: { text: string }) {
   );
 }
 
-function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
+function TopBar({ title, onBack }: { title: string; onBack?: () => void }) {
   return (
     <div
       data-tauri-drag-region="deep"
@@ -353,16 +355,18 @@ function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
       }}
     >
-      <Button
-        size="small"
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        aria-label="返回"
-        onClick={onBack}
-        style={{ width: 28, height: 28, borderRadius: 8 }}
-        title="返回 (esc)"
-      />
-      <Typography.Text strong style={{ fontSize: 14, fontWeight: 600, marginLeft: 8 }}>
+      {onBack && (
+        <Button
+          size="small"
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          aria-label="返回"
+          onClick={onBack}
+          style={{ width: 28, height: 28, borderRadius: 8 }}
+          title="返回 (esc)"
+        />
+      )}
+      <Typography.Text strong style={{ fontSize: 14, fontWeight: 600, marginLeft: onBack ? 8 : 0 }}>
         {title}
       </Typography.Text>
     </div>

@@ -29,14 +29,18 @@ import {
 } from "./designTokens";
 
 
+/** 左导航「设置」里的四项；选中时左栏不动，只换右侧内容区 */
+export type PaneKey = "brothers" | "preferences" | "shortcuts" | "marketSources";
+
 interface SpotlightProps {
   onSelect: (key: string) => void;
   onClose: () => void;
   onOpenMarket: () => void;
-  onOpenPreferences: () => void;
-  onOpenShortcuts: () => void;
-  onOpenMarketSources: () => void;
-  onOpenBrothers: () => void;
+  /** 当前右栏显示哪一项设置；null = 显示工具列表 */
+  paneKey: PaneKey | null;
+  /** 右栏要渲染的内容（由 App 组好，Spotlight 只管位置） */
+  pane: React.ReactNode;
+  onSelectPane: (key: PaneKey | null) => void;
 }
 
 type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
@@ -47,7 +51,14 @@ type NavKey = "all" | "builtin" | "external" | "starred" | "recent";
  *  - 左/中列: 极简导航, 圆角 hover/active
  *  - 右列功能行: 渐变 active 背景 + scale 1.005 + 阴影 + cmds chip 渐变
  */
-export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, onOpenShortcuts, onOpenMarketSources, onOpenBrothers }: SpotlightProps) {
+export function Spotlight({
+  onSelect,
+  onClose,
+  onOpenMarket,
+  paneKey,
+  pane,
+  onSelectPane,
+}: SpotlightProps) {
   const [query, setQuery] = useState("");
   const [activeNav, setActiveNav] = useState<NavKey>("all");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -73,34 +84,43 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     [disabled]
   );
 
+  /** 外部插件的一条 feature 一条结果，和内置工具同构 */
+  const extFeatures = useMemo<ToolMeta[]>(() => {
+    const out: ToolMeta[] = [];
+    for (const p of extPlugins) {
+      if (p.error) continue;
+      for (const f of p.features) {
+        out.push({
+          key: `ext::${p.id}::${f.code}`,
+          label: f.explain,
+          description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
+          group: p.id,
+          groupLabel: `📦 ${p.name}`,
+          icon: p.logoUrl ? (
+            <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
+          ) : (
+            <AppstoreOutlined />
+          ),
+          cmds: f.cmds ?? [],
+          render: () => null,
+        });
+      }
+    }
+    return out;
+  }, [extPlugins]);
+
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
     let pool: ToolMeta[] = [];
 
     if (activeNav === "all") {
-      pool = allTools;
+      // 「所有功能」= 内置 + 外部插件；「内置插件」只给内置 ——
+      // 两项内容一样的话，左栏第二项就是死按钮。
+      pool = [...allTools, ...extFeatures];
     } else if (activeNav === "builtin") {
       pool = allTools;
     } else if (activeNav === "external") {
-      for (const p of extPlugins) {
-        if (p.error) continue;
-        for (const f of p.features) {
-          pool.push({
-            key: `ext::${p.id}::${f.code}`,
-            label: f.explain,
-            description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
-            group: p.id,
-            groupLabel: `📦 ${p.name}`,
-            icon: p.logoUrl ? (
-              <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
-            ) : (
-              <AppstoreOutlined />
-            ),
-            cmds: f.cmds ?? [],
-            render: () => null,
-          });
-        }
-      }
+      pool = extFeatures;
     } else if (activeNav === "starred") {
       pool = starred.map((k) => allTools.find((t) => t.key === k)).filter(Boolean) as ToolMeta[];
     } else if (activeNav === "recent") {
@@ -108,33 +128,11 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     }
 
     if ((activeNav === "all" || activeNav === "builtin") && activeCategory !== "all") {
-      if (activeCategory === "external") {
-        pool = [];
-        for (const p of extPlugins) {
-          if (p.error) continue;
-          for (const f of p.features) {
-            pool.push({
-              key: `ext::${p.id}::${f.code}`,
-              label: f.explain,
-              description: `${p.name} · ${f.cmds?.join(" / ") ?? ""}`,
-              group: p.id,
-              groupLabel: `📦 ${p.name}`,
-              icon: p.logoUrl ? (
-                <img src={p.logoUrl} style={{ width: 14, height: 14, borderRadius: 2 }} />
-              ) : (
-                <AppstoreOutlined />
-              ),
-              cmds: f.cmds ?? [],
-              render: () => null,
-            });
-          }
-        }
-      } else {
-        pool = pool.filter((t) => {
-          if (t.key.startsWith("ext::")) return false;
-          return t.group === activeCategory;
-        });
-      }
+      pool = pool.filter((t) => {
+        if (activeCategory === "external") return t.key.startsWith("ext::");
+        if (t.key.startsWith("ext::")) return false;
+        return t.group === activeCategory;
+      });
     }
 
     if (q) {
@@ -148,7 +146,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     }
 
     return pool;
-  }, [activeNav, activeCategory, query, allTools, starred, recent, extPlugins, disabled]);
+  }, [activeNav, activeCategory, query, allTools, extFeatures, starred, recent]);
 
   useEffect(() => {
     if (items.length > 0 && (!activeKey || !items.find((t) => t.key === activeKey))) {
@@ -161,6 +159,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     const handler = (e: KeyboardEvent) => {
       // 输入法组字期间的 Enter/方向键属于输入法，不是"打开工具"
       if (e.isComposing) return;
+      // 右侧是设置内容时，方向键/回车不该去操作背后的工具列表；
+      // Esc 交给 App（回工具列表，再按一次才隐藏窗口）
+      if (paneKey) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
@@ -191,7 +192,7 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
     // 捕获阶段：必须比 App.tsx 的 Esc 处理器更早，否则一下 Esc 既清空又隐藏窗口
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
-  }, [items, activeKey, onSelect, query]);
+  }, [items, activeKey, onSelect, query, paneKey]);
 
   useEffect(() => {
     if (!activeKey) return;
@@ -227,7 +228,11 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           }
           placeholder="搜索功能 / 粘贴文件、图片"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            // 在设置页里开始搜索 ⇒ 回到工具列表，不然输入框看着像坏了
+            if (paneKey && e.target.value) onSelectPane(null);
+          }}
           variant="borderless"
           style={{ 
             fontSize: 15, 
@@ -266,8 +271,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<AppstoreOutlined />}
               label="所有功能"
-              active={activeNav === "all"}
+              active={!paneKey && activeNav === "all"}
               onClick={() => {
+                onSelectPane(null);
                 setActiveNav("all");
                 setActiveCategory("all");
               }}
@@ -275,8 +281,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<ToolOutlined />}
               label="内置插件"
-              active={activeNav === "builtin"}
+              active={!paneKey && activeNav === "builtin"}
               onClick={() => {
+                onSelectPane(null);
                 setActiveNav("builtin");
                 setActiveCategory("all");
               }}
@@ -284,8 +291,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<AppstoreOutlined style={{ color: "#a855f7" }} />}
               label="外部插件"
-              active={activeNav === "external"}
+              active={!paneKey && activeNav === "external"}
               onClick={() => {
+                onSelectPane(null);
                 setActiveNav("external");
                 setActiveCategory("all");
               }}
@@ -296,8 +304,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<StarOutlined style={{ color: "#f59e0b" }} />}
               label="我的收藏"
-              active={activeNav === "starred"}
+              active={!paneKey && activeNav === "starred"}
               onClick={() => {
+                onSelectPane(null);
                 setActiveNav("starred");
                 setActiveCategory("all");
               }}
@@ -306,8 +315,9 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<RocketOutlined style={{ color: "#06b6d4" }} />}
               label="最近使用"
-              active={activeNav === "recent"}
+              active={!paneKey && activeNav === "recent"}
               onClick={() => {
+                onSelectPane(null);
                 setActiveNav("recent");
                 setActiveCategory("all");
               }}
@@ -318,28 +328,38 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             <NavItem
               icon={<AppstoreOutlined />}
               label="家族应用"
-              onClick={onOpenBrothers}
+              active={paneKey === "brothers"}
+              onClick={() => onSelectPane("brothers")}
             />
             <NavItem
               icon={<SettingOutlined />}
               label="偏好设置"
-              onClick={onOpenPreferences}
+              active={paneKey === "preferences"}
+              onClick={() => onSelectPane("preferences")}
             />
             <NavItem
               icon={<KeyOutlined />}
               label="快捷键"
-              onClick={onOpenShortcuts}
+              active={paneKey === "shortcuts"}
+              onClick={() => onSelectPane("shortcuts")}
             />
             <NavItem
               icon={<GlobalOutlined />}
               label="市场源管理"
-              onClick={onOpenMarketSources}
+              onClick={() => onSelectPane("marketSources")}
               badge={sourcesCount > 0 ? sourcesCount : undefined}
-              active={false}
+              active={paneKey === "marketSources"}
             />
           </NavSection>
         </div>
 
+        {paneKey ? (
+          // 设置页：左导航保持不动，右栏整块替换（不再整版面跳走）
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+            {pane}
+          </div>
+        ) : (
+        <>
         {/* 中列: 分类 */}
         <div
           className="zBizScroll"
@@ -374,13 +394,16 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
                   />
                 );
               })}
-              <NavItem
-                icon={<AppstoreOutlined style={{ color: "#a855f7" }} />}
-                label="外部插件"
-                active={activeCategory === "external"}
-                onClick={() => setActiveCategory("external")}
-                badge={extPlugins.length}
-              />
+              {/* 「内置插件」只列内置分类；外部插件分类只在「所有功能」下出现 */}
+              {activeNav === "all" && (
+                <NavItem
+                  icon={<AppstoreOutlined style={{ color: "#a855f7" }} />}
+                  label="外部插件"
+                  active={activeCategory === "external"}
+                  onClick={() => setActiveCategory("external")}
+                  badge={extPlugins.length}
+                />
+              )}
             </NavSection>
           )}
 
@@ -507,11 +530,16 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
           >
             <div style={{ display: "flex", gap: 4 }}>
               <TabButton active>
-                功能 ({query ? items.length : allTools.length + extPlugins.reduce((s, p) => s + p.features.length, 0)})
+                {activeNav === "builtin"
+                  ? "内置插件"
+                  : activeNav === "external"
+                  ? "外部插件"
+                  : "功能"}{" "}
+                ({items.length})
               </TabButton>
               {query && <TabButton>匹配 ({items.length})</TabButton>}
             </div>
-            {extPlugins.length > 0 && (
+            {extPlugins.length > 0 && activeNav !== "builtin" && (
               <span
                 style={{
                   fontSize: 11,
@@ -603,6 +631,8 @@ export function Spotlight({ onSelect, onClose, onOpenMarket, onOpenPreferences, 
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* 底栏: 玻璃态 */}

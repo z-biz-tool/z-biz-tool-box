@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { startDeepLinkReceiver, ZBIZ_TAKE_PENDING } from "z-biz-tool-shared/protocol";
-import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary } from "./_shared";
+import { ThemeProvider, Spotlight, MarketView, EmptyState, PreferencesView, ShortcutsView, BrothersView, DragHandle, ErrorBoundary, type PaneKey } from "./_shared";
 import { MarketSourceManager } from "./_shared/MarketSourceManager";
 import { getTool, getGroupOfTool, ALL_TOOLS } from "./tools";
 import { pushTrayTools } from "./trayBridge";
@@ -19,20 +19,33 @@ import { resolveBoxDeepLink, type HandoffItem } from "./_shared/deepLink";
 /** tray 只推内置工具 ⇒ 可路由的 key 集合在模块加载时就固定 */
 const TOOL_KEYS = ALL_TOOLS.map((t) => t.key);
 
-function parseActiveKey(key: string):
+type ParsedKey =
   | { kind: "spotlight" }
   | { kind: "market" }
-  | { kind: "preferences" }
-  | { kind: "shortcuts" }
-  | { kind: "brothers"; highlight: string | null }
+  /** 设置类页面：左导航不动，只换 Spotlight 右栏 */
+  | { kind: "pane"; pane: PaneKey; highlight: string | null }
   | { kind: "external"; pluginId: string; featureCode: string }
-  | { kind: "builtin" } {
+  | { kind: "builtin" };
+
+function parseActiveKey(key: string): ParsedKey {
   if (key === "spotlight") return { kind: "spotlight" };
   if (key === "market") return { kind: "market" };
-  if (key === "preferences") return { kind: "preferences" };
-  if (key === "shortcuts") return { kind: "shortcuts" };
+  if (key === "preferences") return { kind: "pane", pane: "preferences", highlight: null };
+  if (key === "shortcuts") return { kind: "pane", pane: "shortcuts", highlight: null };
   if (key.startsWith("brothers::")) {
-    return { kind: "brothers", highlight: key.slice("brothers::".length) || null };
+    return { kind: "pane", pane: "brothers", highlight: key.slice("brothers::".length) || null };
+  }
+  if (key.startsWith("pane::")) {
+    const pane = key.slice("pane::".length) as PaneKey;
+    if (
+      pane === "brothers" ||
+      pane === "preferences" ||
+      pane === "shortcuts" ||
+      pane === "marketSources"
+    ) {
+      return { kind: "pane", pane, highlight: null };
+    }
+    return { kind: "spotlight" };
   }
   if (key.startsWith("ext::")) {
     const [, pluginId, featureCode] = key.split("::");
@@ -144,7 +157,17 @@ export default function App() {
 
   useEffect(() => {
     const k = activeKey;
-    if (k !== "spotlight" && k !== "market") pushRecent(k);
+    // 设置类页面不是「用过的工具」，进最近使用会让列表变脏
+    if (
+      k !== "spotlight" &&
+      k !== "market" &&
+      k !== "preferences" &&
+      k !== "shortcuts" &&
+      !k.startsWith("pane::") &&
+      !k.startsWith("brothers::")
+    ) {
+      pushRecent(k);
+    }
   }, [activeKey, pushRecent]);
 
   useEffect(() => {
@@ -321,15 +344,29 @@ export default function App() {
         `}</style>
         <div className="zBizApp" style={{ display: "contents" }}>
         {/* 视图顶部由各 view 自行用 <DragHandle /> 提供可拖动区域 + 抓手 icon */}
-        {active.kind === "spotlight" ? (
+        {active.kind === "spotlight" || active.kind === "pane" ? (
+          // 设置类页面也由 Spotlight 承载：左导航 + 顶栏常驻，只换右栏
           <Spotlight
             onSelect={setActiveKey}
             onClose={hideWindow}
             onOpenMarket={() => setActiveKey("market")}
-            onOpenPreferences={() => setActiveKey("preferences")}
-            onOpenShortcuts={() => setActiveKey("shortcuts")}
-            onOpenMarketSources={() => setSourceMgrOpen(true)}
-            onOpenBrothers={() => setActiveKey("brothers::")}
+            paneKey={active.kind === "pane" ? active.pane : null}
+            pane={
+              active.kind !== "pane" ? null : active.pane === "brothers" ? (
+                <BrothersView
+                  embedded
+                  onBack={() => setActiveKey("spotlight")}
+                  highlightKey={active.highlight}
+                />
+              ) : active.pane === "preferences" ? (
+                <PreferencesView embedded onBack={() => setActiveKey("spotlight")} />
+              ) : active.pane === "shortcuts" ? (
+                <ShortcutsView embedded onBack={() => setActiveKey("spotlight")} />
+              ) : (
+                <MarketSourceManager inline open onClose={() => setActiveKey("spotlight")} />
+              )
+            }
+            onSelectPane={(k) => setActiveKey(k ? `pane::${k}` : "spotlight")}
           />
         ) : active.kind === "market" ? (
           <MarketView
@@ -337,15 +374,6 @@ export default function App() {
             onBack={() => setActiveKey("spotlight")}
             onOpenMarketSources={() => setSourceMgrOpen(true)}
             onSelectTool={(key) => setActiveKey(key)}
-          />
-        ) : active.kind === "preferences" ? (
-          <PreferencesView onBack={() => setActiveKey("spotlight")} />
-        ) : active.kind === "shortcuts" ? (
-          <ShortcutsView onBack={() => setActiveKey("spotlight")} />
-        ) : active.kind === "brothers" ? (
-          <BrothersView
-            onBack={() => setActiveKey("spotlight")}
-            highlightKey={active.highlight}
           />
         ) : (
           <ToolView

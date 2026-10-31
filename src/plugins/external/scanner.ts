@@ -108,8 +108,10 @@ async function loadOnePlugin(
 /** 暴露给 UI,用户在 QuickOpen 或 PluginMarket 里可一键打开插件目录 */
 export async function openPluginsDir(): Promise<void> {
   const dir = await pluginsDir();
-  const { open } = await import("@tauri-apps/plugin-shell");
-  await open(dir);
+  // 不能用 plugin-shell 的 open(): 它的命令参数被 scope 正则限定成
+  // mailto:/tel:/http(s)://,本地路径会被拒。走 Rust 命令直接交给系统文件管理器。
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_local_path", { path: dir });
 }
 
 /**

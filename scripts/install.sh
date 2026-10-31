@@ -147,7 +147,8 @@ info "安装目标: $INSTALL_DIR/$APP_NAME.app"
 info "[1/3] 构建前端..."
 if [ ! -d node_modules ]; then
   warn "node_modules 不存在，先安装依赖..."
-  npm install
+  # 组织硬规则：JS 依赖只用 pnpm（npm 会重建拷贝布局，废掉 store 共享）
+  pnpm install
 fi
 npm run build
 
@@ -155,6 +156,24 @@ npm run build
 info "[2/3] 编译 Rust 后端 + 打 .app bundle（首次约 5-10 分钟）..."
 # --no-bundle 可以只产出二进制不打包，但我们要 .app 所以保留 bundle
 # 我们这里只产出 .app，不生成 .dmg（用户场景是替换现有 .app，无需 dmg）
+#
+# 签名密钥兜底：tauri.conf.json 里 createUpdaterArtifacts=true 且 updater.pubkey 非空，
+# tauri build 就必须拿到私钥，否则报 "A public key has been found, but no private
+# key has been provided"。CI 那边有 --no-sign 兜底，本地脚本没有。
+# 所以这里在环境变量缺失时读 CEO 本机的 ~/.zbiz/tauri-signing.key（口令为空）。
+# 只在变量未设置时兜底，外部显式传入的永远优先；私钥内容不打印。
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+  SIGNING_KEY_FILE="${HOME}/.zbiz/tauri-signing.key"
+  if [ -f "$SIGNING_KEY_FILE" ]; then
+    TAURI_SIGNING_PRIVATE_KEY="$(cat "$SIGNING_KEY_FILE")"
+    export TAURI_SIGNING_PRIVATE_KEY
+    export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
+    info "已从 $SIGNING_KEY_FILE 载入 updater 签名私钥"
+  else
+    warn "找不到 $SIGNING_KEY_FILE，build 可能因缺 updater 私钥失败"
+    warn "（可设 TAURI_SIGNING_PRIVATE_KEY 环境变量，或用 npx tauri build --no-sign 跳过 updater 产物）"
+  fi
+fi
 TAURI_SKIP_DMG=1 npx tauri build --bundles app
 
 # 查找 .app 产物（以 cargo metadata 为准，见文件头说明）

@@ -4,6 +4,8 @@ import { Button } from "antd";
 
 interface ShortcutsViewProps {
   onBack: () => void;
+  /** 嵌在 Spotlight 右栏里：只占右栏高度，标题栏不出返回按钮 */
+  embedded?: boolean;
 }
 
 interface ShortcutItem {
@@ -28,14 +30,14 @@ const SHORTCUTS: ShortcutItem[] = [
  * 快捷键速查 — 与代码同步维护。
  * 修改 lib.rs (Rust 端) 或 App.tsx (前端) 时,这里也要同步。
  */
-export function ShortcutsView({ onBack }: ShortcutsViewProps) {
+export function ShortcutsView({ onBack, embedded = false }: ShortcutsViewProps) {
   const groups = Array.from(new Set(SHORTCUTS.map((s) => s.group)));
 
   return (
     <div
       data-tauri-drag-region
       style={{
-        height: "100vh",
+        height: embedded ? "100%" : "100vh",
         display: "flex",
         flexDirection: "column",
         background: "var(--ant-color-bg-container)",
@@ -53,16 +55,18 @@ export function ShortcutsView({ onBack }: ShortcutsViewProps) {
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
         }}
       >
-        <Button
-          size="small"
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          aria-label="返回"
-          onClick={onBack}
-          style={{ width: 28, height: 28, borderRadius: 8 }}
-          title="返回 (esc)"
-        />
-        <Typography.Text strong style={{ fontSize: 14, fontWeight: 600, marginLeft: 8 }}>
+        {!embedded && (
+          <Button
+            size="small"
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            aria-label="返回"
+            onClick={onBack}
+            style={{ width: 28, height: 28, borderRadius: 8 }}
+            title="返回 (esc)"
+          />
+        )}
+        <Typography.Text strong style={{ fontSize: 14, fontWeight: 600, marginLeft: embedded ? 0 : 8 }}>
           快捷键
         </Typography.Text>
       </div>

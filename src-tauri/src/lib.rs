@@ -52,8 +52,10 @@ pub fn run() {
             get_state,
             apply_window_prefs,
             uninstall_plugin,
+            open_local_path,
             installer::brother_overview,
             installer::install_brother,
+            installer::update_all_brothers,
             installer::launch_brother,
             zbiz_take_pending,
             logging::write_log,
@@ -223,6 +225,106 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
     std::fs::remove_dir_all(&dir).map_err(|e| format!("删除失败: {e}"))?;
     eprintln!("[z-biz] uninstalled plugin: {id} (path={})", dir.display());
     Ok(())
+}
+
+/// 用系统文件管理器打开一个本机目录（不存在就建出来）。
+///
+/// 前端原来用 `@tauri-apps/plugin-shell` 的 `open(dir)`，但那个命令的参数校验
+/// 只认 mailto:/tel:/http(s):// —— 传本地路径会被 scoped-command 校验拒掉，
+/// 用户看到的是「Scoped command argument at position 0 ... failed regex validation」。
+/// 打开目录本来就是本地动作，走系统命令最直接，也不用再给前端加一个插件依赖。
+///
+/// 限制在主目录内：这个命令不该变成任意路径的通用执行口。
+#[tauri::command]
+fn open_local_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let home = app
+        .path()
+        .home_dir()
+        .map_err(|e| format!("home_dir 失败: {e}"))?;
+    let canon = resolve_open_path(&home, &path)?;
+
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer");
+    #[cfg(target_os = "linux")]
+    let mut cmd = std::process::Command::new("xdg-open");
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    return Err("当前平台不支持打开目录".into());
+
+    #[allow(unreachable_code)]
+    cmd.arg(&canon)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开目录失败: {e}"))
+}
+
+/// 校验并落成待打开路径：绝对路径 + 无 `..` + 规范化后仍在主目录内。
+/// 建目录放在校验中间是有意的：不存在的新目录 canonicalize 不出来。
+fn resolve_open_path(home: &std::path::Path, path: &str) -> Result<std::path::PathBuf, String> {
+    let home = home.canonicalize().unwrap_or_else(|_| home.to_path_buf());
+    let requested = std::path::PathBuf::from(path);
+    if !requested.is_absolute() {
+        return Err(format!("路径必须是绝对路径: {path}"));
+    }
+    // 建目录之前先挡 `..`：create_dir_all 不认「主目录之外」，
+    // 先建后查等于让调用方在主目录外留目录。
+    if requested
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(format!("路径不能包含 ..: {path}"));
+    }
+    // 词法上就必须在主目录里，这样 create_dir_all 没有机会在外面留目录
+    if !requested.starts_with(&home) {
+        return Err(format!("只允许打开主目录下的路径: {}", requested.display()));
+    }
+    std::fs::create_dir_all(&requested).map_err(|e| format!("建目录失败: {e}"))?;
+    // 建完再规范化一次：符号链接指向主目录之外的情况只有 canonicalize 看得出来
+    let canon = requested
+        .canonicalize()
+        .map_err(|e| format!("解析路径失败: {e}"))?;
+    if !canon.starts_with(home) {
+        return Err(format!("只允许打开主目录下的路径: {}", canon.display()));
+    }
+    Ok(canon)
+}
+
+#[cfg(test)]
+mod open_path_tests {
+    use super::resolve_open_path;
+
+    #[test]
+    fn 相对路径与父目录跳转一律拒绝() {
+        let home = std::env::temp_dir().canonicalize().unwrap();
+        assert!(resolve_open_path(&home, "relative/dir").is_err());
+        assert!(resolve_open_path(&home, "/tmp/../etc").is_err());
+    }
+
+    #[test]
+    fn 主目录之外的路径拒绝() {
+        let home = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join("zbiz-home-outside");
+        std::fs::create_dir_all(&home).unwrap();
+        assert!(resolve_open_path(&home, "/etc").is_err());
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn 主目录内缺失目录会被建出来() {
+        let home = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join("zbiz-open-home");
+        std::fs::create_dir_all(&home).unwrap();
+        let target = home.join("plugins");
+        let got = resolve_open_path(&home, target.to_str().unwrap()).unwrap();
+        assert!(got.ends_with("plugins"));
+        assert!(target.is_dir());
+        let _ = std::fs::remove_dir_all(&home);
+    }
 }
 
 // 抑制 show_main_window 未使用警告(它由快捷键 handler 引用)

@@ -92,12 +92,30 @@ fn cache() -> &'static Cache {
     C.get_or_init(|| Cache(Mutex::new(HashMap::new())))
 }
 
-fn client() -> reqwest::blocking::Client {
+/// 查 release 的 client。20 秒总超时对 API 查询是合适的。
+fn api_client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder()
         .user_agent(UA)
         .timeout(Duration::from_secs(20))
         .build()
         .expect("构建 HTTP client 失败")
+}
+
+/// 下载安装包的 client。**不能带短总超时**。
+///
+/// 2026-10-31 实测事故：这里原来复用带 20s 超时的 client，6.5MB 的资产在
+/// 慢网（实测 35KB/s）下 20 秒只能拉到 700KB，于是每次都中途夭折，
+/// 面板上留下一排卡在 32%/58%/85% 的进度条，报「下载请求失败:
+/// error sending request for url」。
+/// 这里改成：连接 15 秒超时 + 整体 30 分钟上限（慢网下 30MB 也够跑完），
+/// 中间断了还能靠 Range 续传。
+fn download_client() -> reqwest::blocking::Client {
+    reqwest::blocking::Client::builder()
+        .user_agent(UA)
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(30 * 60))
+        .build()
+        .expect("构建下载 client 失败")
 }
 
 fn unreachable_state(note: &str) -> BrotherRelease {
@@ -135,7 +153,7 @@ fn fetch_latest(repo: &str) -> BrotherRelease {
         return unreachable_state("仓库名非法");
     }
     let url = format!("{API}/repos/z-biz-tool/{repo}/releases/latest");
-    let resp = match client().get(&url).send() {
+    let resp = match api_client().get(&url).send() {
         Ok(r) => r,
         Err(e) => return unreachable_state(&format!("请求失败: {e}")),
     };
@@ -213,7 +231,7 @@ fn fetch_latest(repo: &str) -> BrotherRelease {
 /// 后者提示「有包但未发布」,是两种要做的运营动作。
 fn no_published_release(repo: &str) -> BrotherRelease {
     let url = format!("{API}/repos/z-biz-tool/{repo}/releases?per_page=5");
-    let drafts: Vec<String> = match client().get(&url).send() {
+    let drafts: Vec<String> = match api_client().get(&url).send() {
         Ok(r) if r.status().is_success() => r
             .json::<serde_json::Value>()
             .ok()
@@ -383,6 +401,108 @@ pub fn launch_brother(key: String, target: Option<LaunchTarget>) -> Result<(), S
     crate::brother_tools::launch_uri(&path, &uri)
 }
 
+// ---------------------------------------------------------------- 批量更新
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFailure {
+    pub key: String,
+    pub name: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateResult {
+    pub updated: Vec<String>,
+    pub failed: Vec<BatchFailure>,
+    /// 未安装 / 已是最新 / 查不到 release 的，都计入这里
+    pub skipped: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BatchProgress {
+    key: String,
+    display_name: String,
+    index: usize,
+    total: usize,
+}
+
+/// 一键更新：把所有「已装且远端版本更高」的兄弟逐个更新。
+///
+/// 顺序执行而不是并发：瓶颈在用户出口带宽（2026-10-31 实测 35KB/s），
+/// 并发只会互相抢带宽，而且失败时难以归因到哪一条连接。
+#[tauri::command]
+pub async fn update_all_brothers(app: AppHandle) -> Result<BatchUpdateResult, String> {
+    tauri::async_runtime::spawn_blocking(move || run_update_all(&app))
+        .await
+        .map_err(|e| format!("更新任务异常退出: {e}"))
+}
+
+fn run_update_all(app: &AppHandle) -> BatchUpdateResult {
+    let cache_dir = app
+        .path()
+        .cache_dir()
+        .map(|d| d.join("brother-install"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("brother-install"));
+    let _ = std::fs::create_dir_all(&cache_dir);
+
+    let mut targets = Vec::new();
+    let mut skipped = 0;
+    for b in crate::brother_tools::all_brothers_with_state() {
+        if b.installed_path.is_none() {
+            skipped += 1;
+            continue;
+        }
+        // 用缓存：面板刚查过一遍，再 force 只会白烧匿名 API 额度
+        let release = latest_release(&b.name, false);
+        let needs = matches!(release.state, ReleaseState::Ok)
+            && matches!((&b.installed_version, &release.version),
+                        (Some(iv), Some(rv)) if version_gt(rv, iv));
+        if needs {
+            targets.push((b, release));
+        } else {
+            skipped += 1;
+        }
+    }
+
+    let total = targets.len();
+    let mut updated = Vec::new();
+    let mut failed = Vec::new();
+    for (i, (b, release)) in targets.iter().enumerate() {
+        let _ = app.emit(
+            "brother-batch-progress",
+            BatchProgress {
+                key: b.key.clone(),
+                display_name: b.display_name.clone(),
+                index: i + 1,
+                total,
+            },
+        );
+        let key = b.key.clone();
+        let outcome = install_core_with_release(b, &cache_dir, release, &mut |phase, got, tot| {
+            emit_progress(app, &key, phase, got, tot, None)
+        });
+        match outcome {
+            Ok(()) => updated.push(b.display_name.clone()),
+            Err(e) => {
+                emit_progress(app, &key, "error", None, None, Some(e.clone()));
+                failed.push(BatchFailure {
+                    key: b.key.clone(),
+                    name: b.display_name.clone(),
+                    message: e,
+                });
+            }
+        }
+    }
+    BatchUpdateResult {
+        updated,
+        failed,
+        skipped,
+    }
+}
+
 fn emit_progress(
     app: &AppHandle,
     key: &str,
@@ -429,13 +549,25 @@ pub fn install_core(
     cache_dir: &Path,
     progress: Progress,
 ) -> Result<(), String> {
+    let release = latest_release(&seed.name, true);
+    install_core_with_release(seed, cache_dir, &release, progress)
+}
+
+/// 用已知的 release 走完整安装链路。批量更新时 release 是刚查过的，
+/// 再 force 查一遍只会多烧一次匿名 API 额度。
+fn install_core_with_release(
+    seed: &crate::brother_tools::BrotherEntry,
+    cache_dir: &Path,
+    release: &BrotherRelease,
+    progress: Progress,
+) -> Result<(), String> {
     if !cfg!(target_os = "macos") {
         return Err("自动安装目前只实现了 macOS 路径".into());
     }
-    let release = latest_release(&seed.name, true);
     if !matches!(release.state, ReleaseState::Ok) {
         return Err(release
             .note
+            .clone()
             .unwrap_or_else(|| "该仓当前没有可安装的 release".into()));
     }
     let asset_name = release.asset_name.clone().unwrap();
@@ -479,7 +611,13 @@ pub fn install_core(
 
     progress("install", None, None);
     let dest_root = install_root()?;
-    install_app(&extracted, &dest_root.join(format!("{}.app", seed.name)))?;
+    let dest = dest_root.join(format!("{}.app", seed.name));
+    // 覆盖更新一个正在运行的 app 时，进程还持有旧二进制 —— 用户点完「更新」
+    // 看到的仍是旧版本，会以为没生效。先请它自己退出（同名 app 按名字可寻址）。
+    if dest.exists() {
+        quit_running_app(&seed.name);
+    }
+    install_app(&extracted, &dest)?;
 
     let _ = std::fs::remove_dir_all(&staging);
     let _ = std::fs::remove_file(&archive);
@@ -493,24 +631,89 @@ pub fn install_core(
     Ok(())
 }
 
-/// 逐块下载并推进度。reqwest blocking 的 chunk 读法,不用整包进内存。
+/// 下载安装包：断点续传 + 失败重试。
+///
+/// 慢网下断流是常态（实测 35KB/s，6.5MB 要 3 分钟），所以：
+/// - 上一次留下的半截文件用 Range 续传，不从零开始；
+/// - 连接错误重试 3 次，退避 3s/6s，重试之间保留已下字节。
 fn download(
     url: &str,
     dest: &Path,
     expected: Option<u64>,
     progress: Progress,
 ) -> Result<(), String> {
-    let mut resp = client()
-        .get(url)
-        .send()
-        .map_err(|e| format!("下载请求失败: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("下载返回 {}", resp.status()));
+    const ATTEMPTS: u32 = 3;
+    let mut last = String::new();
+    for attempt in 1..=ATTEMPTS {
+        match download_once(url, dest, expected, progress) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last = e;
+                if attempt < ATTEMPTS {
+                    eprintln!(
+                        "[z-biz] 下载中断({attempt}/{ATTEMPTS}): {last} —— 半截文件保留，续传重试"
+                    );
+                    std::thread::sleep(Duration::from_secs(3 * attempt as u64));
+                }
+            }
+        }
     }
-    let total = expected.or_else(|| resp.content_length());
-    let mut file = std::fs::File::create(dest).map_err(|e| format!("建临时文件失败: {e}"))?;
+    Err(last)
+}
+
+fn download_once(
+    url: &str,
+    dest: &Path,
+    expected: Option<u64>,
+    progress: Progress,
+) -> Result<(), String> {
+    let resume_from = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
+    if let Some(t) = expected {
+        if resume_from == t {
+            progress("download", Some(t), Some(t));
+            return Ok(());
+        }
+        if resume_from > t {
+            let _ = std::fs::remove_file(dest);
+            return download_once(url, dest, expected, progress);
+        }
+    }
+
+    let mut req = download_client().get(url);
+    if resume_from > 0 {
+        req = req.header("Range", format!("bytes={resume_from}-"));
+    }
+    let mut resp = req
+        .send()
+        .map_err(|e| format!("下载请求失败: {}", err_chain(&e)))?;
+    let status = resp.status();
+
+    // 服务端不认这个 Range（例如签名 URL 变了）就重来，不能把两段拼在一起
+    if status.as_u16() == 416 {
+        let _ = std::fs::remove_file(dest);
+        return Err("服务端拒绝了续传范围，已清空重下".into());
+    }
+    let appending = resume_from > 0 && status.as_u16() == 206;
+    if !appending && resume_from > 0 {
+        let _ = std::fs::remove_file(dest);
+    }
+    if !status.is_success() {
+        return Err(format!("下载返回 {}", status.as_u16()));
+    }
+
+    let start = if appending { resume_from } else { 0 };
+    let total = expected.or_else(|| resp.content_length().map(|l| l + start));
+    let mut file = if appending {
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(dest)
+            .map_err(|e| format!("打开续传文件失败: {e}"))?
+    } else {
+        std::fs::File::create(dest).map_err(|e| format!("建临时文件失败: {e}"))?
+    };
+
     let mut buf = vec![0u8; 256 * 1024];
-    let mut received = 0u64;
+    let mut received = start;
     let mut last_emit = Instant::now();
     loop {
         let n = resp
@@ -528,12 +731,29 @@ fn download(
         }
     }
     file.flush().map_err(|e| format!("落盘失败: {e}"))?;
+    progress("download", Some(received), total);
     if let Some(t) = total {
         if received != t {
-            return Err(format!("下载不完整: {received}/{t} 字节"));
+            return Err(format!(
+                "下载不完整: {received}/{t} 字节（下次重试会从 {received} 续传）"
+            ));
         }
     }
     Ok(())
+}
+
+/// reqwest 的 Display 只有「error sending request for url (...)」，
+/// 真正原因（超时 / 连接被重置 / TLS）在 source 链里。不带上它，
+/// 用户看到的错误就等于没说。
+fn err_chain(e: &reqwest::Error) -> String {
+    let mut out = e.to_string();
+    let mut src: Option<&(dyn std::error::Error + 'static)> = std::error::Error::source(e);
+    while let Some(c) = src {
+        out.push_str(": ");
+        out.push_str(&c.to_string());
+        src = c.source();
+    }
+    out
 }
 
 /// Tauri 的 updater 产物:tar.gz 里就是 <Product>.app
@@ -607,6 +827,16 @@ fn install_root() -> Result<PathBuf, String> {
         return Ok(user_apps);
     }
     Err("找不到可写的安装目录".into())
+}
+
+/// 请正在运行的兄弟应用自己退出。覆盖安装时进程仍持有旧二进制，
+/// 不退出的话用户点完更新看到的还是旧版本。失败无妨：单实例/正在运行的
+/// 情况最多让新版本下次启动才生效。
+fn quit_running_app(app_name: &str) {
+    let _ = std::process::Command::new("osascript")
+        .args(["-e", &format!("tell application \"{app_name}\" to quit")])
+        .output();
+    std::thread::sleep(Duration::from_millis(800));
 }
 
 /// 覆盖式安装:先备份旧的,新app落位成功才删备份;失败回滚。
