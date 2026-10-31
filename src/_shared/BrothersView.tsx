@@ -49,6 +49,10 @@ interface BrotherCard {
   hasUpdate: boolean;
   /** base64 PNG(编译期内嵌自各兄弟仓), 缺图时 null → 首字母色块 */
   iconPng: string | null;
+  /** 该产品是否接受 zbiz:// 深链 —— 真值来自产品自己仓根的 product.json */
+  acceptsDeepLink: boolean;
+  /** 该产品支持的深链动作。空 = 只能被唤起，不能接收参数 */
+  deepLinkActions: string[];
   release: BrotherRelease;
 }
 
@@ -374,6 +378,24 @@ function BrotherTile({
                   {card.release.state === "ok" ? "未安装" : state.text}
                 </Tag>
               )}
+              {/* 深链能力：能不能被别的产品带参数唤起，以及能带什么。
+                  这条信息来自产品自己仓根的 product.json —— box 只是读方，
+                  不替别人声明「我支持深链」。 */}
+              {card.acceptsDeepLink ? (
+                <Tooltip
+                  title={
+                    card.deepLinkActions.length
+                      ? `接受 zbiz:// 深链，支持动作：${card.deepLinkActions.join(" / ")}`
+                      : "接受 zbiz:// 深链（只能被唤起，不能接收参数）"
+                  }
+                >
+                  <Tag color="purple" style={tagStyle}>
+                    {card.deepLinkActions.length
+                      ? `可互传 · ${card.deepLinkActions.join("/")}`
+                      : "可唤起"}
+                  </Tag>
+                </Tooltip>
+              ) : null}
             </div>
           </div>
         </div>

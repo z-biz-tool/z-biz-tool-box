@@ -65,6 +65,11 @@ pub struct BrotherCard {
     pub installed_version: Option<String>,
     pub has_update: bool,
     pub icon_png: Option<String>,
+    /// 该产品是否接受 zbiz:// 深链 —— 面板据此显示「可互传」标记。
+    /// 真值来自产品自己的仓根 product.json，不是 box 替它声明的。
+    pub accepts_deep_link: bool,
+    /// 该产品支持的深链动作。空 = 只能被唤起，不能接收参数。
+    pub deep_link_actions: Vec<String>,
     pub release: BrotherRelease,
 }
 
@@ -309,6 +314,8 @@ pub fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String>
                     installed_version: b.installed_version.clone(),
                     has_update,
                     icon_png: crate::brother_tools::icon_png(&b.key).map(base64_encode),
+                    accepts_deep_link: b.accepts_deep_link,
+                    deep_link_actions: b.deep_link_actions.clone(),
                     release,
                 }
             })
@@ -755,6 +762,8 @@ mod tests {
             name: "z-biz-tool-math".into(),
             bundle_id: "com.zifang.z-biz-tool-math".into(),
             display_name: "GeoLab 数学实验室".into(),
+            accepts_deep_link: true,
+            deep_link_actions: vec!["open".into()],
             installed_path: None,
             installed_version: None,
         };

@@ -15,6 +15,10 @@ pub struct BrotherEntry {
     pub name: String,         // "z-biz-tool-worker"
     pub bundle_id: String,    // "com.zifang.z-biz-tool-worker"
     pub display_name: String, // "AI 任务看板"
+    /// 该产品是否接受 zbiz:// 深链（真值来自产品自己的仓根 product.json）
+    pub accepts_deep_link: bool,
+    /// 该产品支持的动作。空 = 只能被唤起，不能接收参数。
+    pub deep_link_actions: Vec<String>,
     pub installed_path: Option<PathBuf>,
     pub installed_version: Option<String>, // 本机 CFBundleShortVersionString
 }
@@ -39,6 +43,12 @@ impl BrotherEntry {
             name: seed.name.to_string(),
             bundle_id: seed.bundle_id.to_string(),
             display_name: seed.display_name.to_string(),
+            accepts_deep_link: seed.accepts_deep_link,
+            deep_link_actions: seed
+                .deep_link_actions
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             installed_path: None,
             installed_version: None,
         }
