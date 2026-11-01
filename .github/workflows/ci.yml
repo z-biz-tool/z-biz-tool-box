@@ -28,7 +28,7 @@ env:
 jobs:
   frontend:
     name: 前端 typecheck + 构建
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +64,9 @@ jobs:
 
   backend:
     name: Rust test + clippy
-    runs-on: ubuntu-22.04
+    # 24.04：cap-screen → xcap → libspa 0.10 需要新 SPA 头，22.04 的
+    # libspa-0.2-dev 编不过（capability 仓 2026-11-01 第三轮实锤同款）。
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
