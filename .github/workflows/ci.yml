@@ -120,8 +120,9 @@ jobs:
         run: |
           sudo apt-get update
           # libpipewire-0.3-dev：cap-screen → xcap → pipewire 的 Linux 系统依赖
-          # （2026-11-01 补：加 cap-screen 后 Linux 腿第一次真编译它）
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libpipewire-0.3-dev
+          # libgbm-dev：xcap → gbm → gbm-sys 链接期要 -lgbm（2026-11-01 实锤：
+          # 24.04 上装了 pipewire 还缺 gbm，链接期 `unable to find library -lgbm`）
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libpipewire-0.3-dev libgbm-dev
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.99.0
