@@ -7368,7 +7368,7 @@ dependencies = [
 
 [[package]]
 name = "z-biz-tool-box"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "base64 0.22.1",
  "cap-hub",

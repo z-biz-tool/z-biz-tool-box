@@ -1,6 +1,6 @@
 [package]
 name = "z-biz-tool-box"
-version = "0.3.2"
+version = "0.3.3"
 description = "插件化工具箱"
 edition = "2021"
 license = "MIT"
