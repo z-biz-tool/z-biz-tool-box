@@ -1024,3 +1024,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&cache);
     }
 }
+
+#[cfg(test)]
+mod bench_overview {
+    use super::*;
+
+    /// 点开「家族面板」时主线程要等的时间 = 这个函数的耗时。
+    /// 修复前它在主线程上同步跑（冻结窗口）；修复后丢进 spawn_blocking，
+    /// 这里量的是「后台线程会占多久、用户等多久看到骨架屏变卡片」。
+    #[test]
+    fn overview_cache_hit_is_fast() {
+        // 第一遍：可能打 GitHub（冷），只要求能返回
+        let t0 = std::time::Instant::now();
+        let cards = brother_overview_blocking(Some(false)).expect("overview");
+        let cold = t0.elapsed();
+        assert_eq!(cards.len(), 15, "应有 15 张卡");
+        println!(
+            "第一遍（可能冷查 GitHub）: {:?}, 卡片 {}",
+            cold,
+            cards.len()
+        );
+
+        // 第二遍：缓存必命中，必须快 —— 这是「面板第二次打开」的用户体感
+        let t1 = std::time::Instant::now();
+        let _ = brother_overview_blocking(Some(false)).expect("overview");
+        let warm = t1.elapsed();
+        println!("缓存命中: {:?}", warm);
+        assert!(warm.as_millis() < 500, "缓存命中应 <500ms，实际 {:?}", warm);
+    }
+}
