@@ -297,7 +297,18 @@ fn version_gt(a: &str, b: &str) -> bool {
 // ---------------------------------------------------------------- 命令
 
 #[tauri::command]
-pub fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String> {
+pub async fn brother_overview(force: Option<bool>) -> Result<Vec<BrotherCard>, String> {
+    // 必须是 async + spawn_blocking：同步命令跑在主线程上，而这个函数要
+    // ① 逐个探测 14 个兄弟（未命中的要起 mdfind 子进程，~40ms/个）
+    // ② 等 12 路 GitHub 请求 join 完（缓存 TTL 一过就是数秒的冷查）。
+    // 主线程被占住 ⇒ 点开面板整个窗口冻住（2026-11-01 用户实测的「卡顿」）。
+    // 丢进阻塞线程池后主线程立刻解放，前端由既有的 Spin 骨架承接。
+    tauri::async_runtime::spawn_blocking(move || brother_overview_blocking(force))
+        .await
+        .map_err(|e| format!("brother_overview 线程崩溃: {e}"))?
+}
+
+fn brother_overview_blocking(force: Option<bool>) -> Result<Vec<BrotherCard>, String> {
     let brothers = crate::brother_tools::all_brothers_with_state();
     let force = force.unwrap_or(false);
 
