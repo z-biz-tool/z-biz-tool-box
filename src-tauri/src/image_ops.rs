@@ -74,7 +74,12 @@ fn canonicalize_lenient(path: &Path) -> PathBuf {
     // 逐级向上：找到第一个存在的祖先
     let mut suffix: Vec<std::ffi::OsString> = Vec::new();
     let mut cur = path.to_path_buf();
-    while let Some(parent) = cur.parent().map(|p| p.to_path_buf()) {
+    loop {
+        let parent = match cur.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+            // 到根了（或已无父目录）：整条路径都不存在 ⇒ 词法规范化兜底
+            _ => break,
+        };
         let name = match cur.file_name() {
             Some(n) => n.to_os_string(),
             None => break,
