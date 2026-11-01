@@ -74,23 +74,19 @@ fn canonicalize_lenient(path: &Path) -> PathBuf {
     // 逐级向上：找到第一个存在的祖先
     let mut suffix: Vec<std::ffi::OsString> = Vec::new();
     let mut cur = path.to_path_buf();
-    loop {
-        if let Some(parent) = cur.parent().map(|p| p.to_path_buf()) {
-            let name = match cur.file_name() {
-                Some(n) => n.to_os_string(),
-                None => break,
-            };
-            suffix.push(name);
-            cur = parent;
-            if let Ok(c) = cur.canonicalize() {
-                let mut out = c;
-                for part in suffix.iter().rev() {
-                    out.push(part);
-                }
-                return out;
+    while let Some(parent) = cur.parent().map(|p| p.to_path_buf()) {
+        let name = match cur.file_name() {
+            Some(n) => n.to_os_string(),
+            None => break,
+        };
+        suffix.push(name);
+        cur = parent;
+        if let Ok(c) = cur.canonicalize() {
+            let mut out = c;
+            for part in suffix.iter().rev() {
+                out.push(part);
             }
-        } else {
-            break;
+            return out;
         }
     }
     // 兜底：词法规范化
@@ -277,7 +273,10 @@ pub fn get_image_info(
 
 /// EXIF 完整快照。
 #[tauri::command]
-pub fn read_exif(scope: State<'_, ImagePathScope>, path: String) -> Result<serde_json::Value, String> {
+pub fn read_exif(
+    scope: State<'_, ImagePathScope>,
+    path: String,
+) -> Result<serde_json::Value, String> {
     let p = scope.resolve(&path)?;
     let data = cap_img::exif::read(&p)?;
     serde_json::to_value(data).map_err(|e| format!("序列化失败: {}", e))
