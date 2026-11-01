@@ -169,7 +169,9 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev
+          # libpipewire-0.3-dev：cap-screen → xcap → pipewire 的 Linux 系统依赖
+          # （2026-11-01 补：加 cap-screen 后 Linux 腿第一次真编译它）
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libpipewire-0.3-dev
 
       # 不钉 registry：走 npm 默认源。
       # 2026-10-03 移除硬编码的 `--registry=https://registry.npmmirror.com` ——
