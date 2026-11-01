@@ -122,8 +122,9 @@ mod tests {
             display_label("z-biz-companion-pet-cos — 桌面宠物", "z-biz-tool-pet"),
             "pet"
         );
-        // 剥空了也要回退，不能给菜单一个空标题
-        assert_eq!(display_label("【冻结】", "z-biz-tool-kb"), "kb");
+        // 剥空了也要回退，不能给菜单一个空标题。
+        // （kb 2026-11-01 归档摘除，这里保留一个同形态的假想仓验证回退路径本身）
+        assert_eq!(display_label("【归档】", "z-biz-tool-legacy"), "legacy");
         assert_eq!(display_label("", "z-biz-tool-note"), "note");
     }
 
