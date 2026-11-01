@@ -44,6 +44,9 @@ import {
   TagsOutlined,
   HistoryOutlined,
   ToolOutlined,
+  PictureOutlined,
+  BorderOutlined,
+  CameraOutlined,
 } from "@ant-design/icons";
 import type { PluginMeta, ToolGroup, ToolMeta } from "./_types";
 
@@ -100,6 +103,9 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   tags: <TagsOutlined />,
   history: <HistoryOutlined />,
   tool: <ToolOutlined />,
+  picture: <PictureOutlined />,
+  border: <BorderOutlined />,
+  camera: <CameraOutlined />,
 };
 
 // ============ 收集所有 plugin meta,组装成 ToolMeta[] ============

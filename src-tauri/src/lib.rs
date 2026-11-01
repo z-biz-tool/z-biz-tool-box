@@ -2,14 +2,23 @@ mod brother_tools;
 // 只在测试构建里编译：生产路径由 build.rs 直接包含同一份源码（见该文件头注释）
 #[cfg(test)]
 mod brother_label;
+mod image_ops;
 mod installer;
 mod logging;
 mod plugin_engine;
 mod tray;
 
+use std::path::PathBuf;
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tray::{create_tray, refresh_menu, show_main_window, toggle_main_window, GroupEntry};
+
+/// 用户主目录（图片能力的路径白名单锚点）。
+fn app_home() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -46,6 +55,17 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         // 深链队列：冷启动 seed 与 second-instance 转发都写它
         .manage(handoff_pending.clone())
+        // 图片能力的路径白名单：只有主目录与 box 自己的工作目录能被读写。
+        // 这条命令面能写文件，无限制等于给前端一个任意写入口。
+        .manage({
+            let mut roots = Vec::new();
+            if let Some(home) = app_home() {
+                // box 自己的工作目录在主目录里，但显式列出更清楚
+                roots.push(home.join(".z-biz-tools"));
+                roots.push(home);
+            }
+            image_ops::ImagePathScope::new(roots)
+        })
         .invoke_handler(tauri::generate_handler![
             register_tools,
             plugin_engine::http_request,
@@ -60,6 +80,23 @@ pub fn run() {
             zbiz_take_pending,
             logging::write_log,
             logging::open_log_dir,
+            image_ops::list_displays,
+            image_ops::list_windows,
+            image_ops::capture_display,
+            image_ops::capture_primary_display,
+            image_ops::capture_region,
+            image_ops::capture_window,
+            image_ops::get_image_info,
+            image_ops::read_exif,
+            image_ops::write_exif,
+            image_ops::strip_exif,
+            image_ops::resize_image,
+            image_ops::rotate_image,
+            image_ops::flip_image,
+            image_ops::crop_image,
+            image_ops::apply_filter,
+            image_ops::export_image,
+            image_ops::get_image_thumbnail,
         ])
         .setup(move |app| {
             // macOS: 设为 Accessory — 出现在菜单栏,不显示 Dock 图标
