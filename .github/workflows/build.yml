@@ -166,7 +166,10 @@ jobs:
         run: rm -f "$HOME/.cargo/config.toml" "$USERPROFILE/.cargo/config.toml"
 
       - name: Install dependencies (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
+        # 条件必须是 runner.os：build 腿已升 24.04（libspa 0.10 需要），
+        # 按版本号 == 'ubuntu-22.04' 判 ⇒ 24.04 腿一个系统库都不装，
+        # glib-2.0.pc 直接找不到（v0.3.3 首发实锤）。
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           # libpipewire-0.3-dev：cap-screen → xcap → pipewire 的 Linux 系统依赖
