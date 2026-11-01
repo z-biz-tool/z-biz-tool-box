@@ -85,6 +85,24 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\..\z-biz-tool-capability" -Target "$env:GITHUB_WORKSPACE\.capability" | Out-Null
 
+      # build.rs codegen 从 ../../z-biz-tool-lead/003_辅助能力/bootstrap/manifest.json
+      # 读兄弟清单（SSoT）。runner 上缺 lead ⇒ 清单为空 ⇒ cargo test 的
+      # 「应有 15 张卡」断言红（2026-11-01 实锤）。补上 lead 的 checkout 并链接。
+      - name: Checkout lead (brother manifest)
+        uses: actions/checkout@v4
+        with:
+          repository: z-biz-tool/z-biz-tool-lead
+          path: .lead
+
+      - name: Link lead (Unix)
+        if: runner.os != 'Windows'
+        run: ln -sfn "$GITHUB_WORKSPACE/.lead" "$GITHUB_WORKSPACE/../z-biz-tool-lead"
+
+      - name: Link lead (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -ItemType Junction -Path "$env:GITHUB_WORKSPACE\..\z-biz-tool-lead" -Target "$env:GITHUB_WORKSPACE\.lead" | Out-Null
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
