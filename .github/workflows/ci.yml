@@ -93,6 +93,10 @@ jobs:
         with:
           repository: z-biz-tool/z-biz-tool-lead
           path: .lead
+          # lead 是 org 里唯一的**私有仓**，GITHUB_TOKEN 只有当前仓的权限 ⇒
+          # 跨仓 checkout 404（2026-11-01 实锤）。LEAD_READ_PAT 是具备
+          # repo 读权限的 PAT，经 org/仓 secret 下发。
+          token: ${{ secrets.LEAD_READ_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Link lead (Unix)
         if: runner.os != 'Windows'

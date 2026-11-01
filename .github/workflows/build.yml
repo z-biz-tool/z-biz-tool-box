@@ -131,6 +131,8 @@ jobs:
         with:
           repository: z-biz-tool/z-biz-tool-lead
           path: .lead
+          # lead 是私有仓，GITHUB_TOKEN 跨仓读不到（404）；与 ci.yml 同修。
+          token: ${{ secrets.LEAD_READ_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Link lead (Unix)
         if: runner.os != 'Windows'
