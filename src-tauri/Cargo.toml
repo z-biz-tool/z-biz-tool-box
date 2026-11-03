@@ -44,14 +44,14 @@ tauri-plugin-process = "~2.4.0"
 #
 # "tauri" feature 打开 receiver 胶水层（AppHandle / 事件 / Tauri 命令）；
 # 核心协议是纯函数、零 tauri 依赖，可被非 Tauri 宿主直接复用。
-cap-hub = { path = "../../z-biz-tool-capability/crates/cap-hub", features = ["tauri"] }
+cap-hub = { path = "../../z-biz-tool-capability/crates/cap-hub", version = "0.1.0", features = ["tauri"] }
 # 能力层：图片原语（cap-img 0.4.0）与屏幕采集（cap-screen 0.1.0）。
 #
 # 2026-11-01 起 box 的「截图工具」不再用前端的 getDisplayMedia 模拟版，
 # 改走真截屏：cap-screen 用 xcap 采像素（多显示器/窗口/区域都支持），
 # 像素级编辑全部下沉到 cap-img —— 前端只做选框交互与预览。
-cap-img = { path = "../../z-biz-tool-capability/crates/cap-img" }
-cap-screen = { path = "../../z-biz-tool-capability/crates/cap-screen" }
+cap-img = "0.4.0"
+cap-screen = { path = "../../z-biz-tool-capability/crates/cap-screen", version = "0.1.0" }
 # 截屏薄壳要把 RGBA 帧编成 PNG（无损，截图主体常是文字）
 image = "0.25"
 base64 = "0.22"
